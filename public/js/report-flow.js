@@ -88,7 +88,12 @@ document.addEventListener('alpine:init', () => {
                 lat = position.coords.latitude;
                 lng = position.coords.longitude;
             } catch (posError) {
-                console.warn('GPS indisponível:', posError);
+                console.warn('GPS indisponível ou negado:', posError);
+                // Fallback automático para não travar o desenvolvimento no PC
+                // Coordenadas simuladas
+                lat = -22.7641;
+                lng = -43.3994;
+                alert('Aviso de Dev: Usando coordenadas simuladas pois o acesso ao GPS foi negado.');
             }
 
             if (!lat || !lng) {
