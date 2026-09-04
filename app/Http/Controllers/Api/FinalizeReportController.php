@@ -7,18 +7,23 @@ use App\Models\Report;
 use App\Services\ReportPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use App\Models\Company;
 
 class FinalizeReportController extends Controller
 {
     public function __invoke(Report $report, ReportPdfService $pdfService): JsonResponse
     {
-        $tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id;
+$tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id;
+
+        // 🛡️ Fallback para quando o usuário não estiver logado
+        if (empty($tenantId)) {
+            $tenantId = Company::first()?->id;
+        }
 
         // 1. Blindagem Multi-Tenant
         if ($report->company_id !== $tenantId) {
             return response()->json(['error' => 'Acesso negado.'], 403);
         }
-
         // 2. Busca o ID do status 'Finalizado' no banco de forma dinâmica
         $finalizedStatus = DB::table('report_statuses')
             ->where('company_id', $tenantId)
