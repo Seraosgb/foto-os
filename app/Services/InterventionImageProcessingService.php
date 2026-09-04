@@ -8,6 +8,7 @@ use App\DTOs\ProcessedPhotoDTO;
 use App\DTOs\AddressDTO;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 
 class InterventionImageProcessingService implements ImageProcessingServiceInterface
 {
@@ -28,8 +29,8 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
         // 1. Salva a imagem original no disco
         $originalPath = $file->storeAs($originalDir, $filename, 'public');
 
-        // 2. Instancia o manager com a string do driver exigida na nova arquitetura
-        $manager = new ImageManager('gd');
+        // 2. Instancia o manager com a classe real do driver exigida na nova arquitetura
+        $manager = new ImageManager(GdDriver::class);
 
         // 3. Lê o arquivo temporário (Fallback Dinâmico de Métodos)
         if (method_exists($manager, 'read')) {
@@ -46,7 +47,9 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
         } else {
             $image->resize(1280, null, function ($constraint) {
                 $constraint->aspectRatio();
-                $constraint->upsize();
+                if (method_exists($constraint, 'upsize')) {
+                    $constraint->upsize();
+                }
             });
         }
 
@@ -65,7 +68,9 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
                 if (method_exists($font, 'file')) {
                     $font->file(5);
                 }
-                $font->color('#FFCC00');
+                if (method_exists($font, 'color')) {
+                    $font->color('#FFCC00');
+                }
             });
             $y += 30;
         }
@@ -79,7 +84,12 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
 
         // 8. Fallback de salvamento com compressão
         if (method_exists($image, 'toJpeg')) {
-            $image->toJpeg(80)->save($processedFullPath);
+            $encoded = $image->toJpeg(80);
+            if (method_exists($encoded, 'save')) {
+                $encoded->save($processedFullPath);
+            } else {
+                file_put_contents($processedFullPath, (string) $encoded);
+            }
         } else {
             $image->save($processedFullPath, 80);
         }
