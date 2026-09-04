@@ -28,17 +28,29 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
         // 1. Salva a imagem original no disco
         $originalPath = $file->storeAs($originalDir, $filename, 'public');
 
-        // 2. Inicia o manipulador de imagem (Sintaxe Exclusiva V2)
-        $manager = new ImageManager(['driver' => 'gd']);
-        $image = $manager->make($file->getRealPath());
+        // 2. Instancia o manager com a string do driver exigida na nova arquitetura
+        $manager = new ImageManager('gd');
 
-        // 3. Redimensiona proporcionalmente para no máximo 1280px (Sintaxe V2)
-        $image->resize(1280, null, function ($constraint) {
-            $constraint->aspectRatio();
-            $constraint->upsize(); // Impede que imagens menores sejam esticadas
-        });
+        // 3. Lê o arquivo temporário (Fallback Dinâmico de Métodos)
+        if (method_exists($manager, 'read')) {
+            $image = $manager->read($file->getPathname());
+        } elseif (method_exists($manager, 'make')) {
+            $image = $manager->make($file->getPathname());
+        } else {
+            $image = $manager->load($file->getPathname());
+        }
 
-        // 4. Monta as linhas de evidência da Marca D'água
+        // 4. Redimensiona proporcionalmente para no máximo 1280px
+        if (method_exists($image, 'scaleDown')) {
+            $image->scaleDown(1280);
+        } else {
+            $image->resize(1280, null, function ($constraint) {
+                $constraint->aspectRatio();
+                $constraint->upsize();
+            });
+        }
+
+        // 5. Monta as linhas de evidência da Marca D'água
         $addressText = $address ? $address->formattedAddress : 'Endereço indisponível ou offline';
         $lines = [
             "OS: {$osNumber} | Data: {$timestamp}",
@@ -46,26 +58,32 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
             "Local: {$addressText}"
         ];
 
-        // 5. Escreve as linhas na imagem (Margem de 30px)
+        // 6. Escreve as linhas na imagem
         $y = 30;
         foreach ($lines as $line) {
             $image->text($line, 30, $y, function ($font) {
-                $font->file(5); // Fonte embutida no GD
+                if (method_exists($font, 'file')) {
+                    $font->file(5);
+                }
                 $font->color('#FFCC00');
             });
             $y += 30;
         }
 
-        // 6. Salva a imagem processada no disco
+        // 7. Salva a imagem processada no disco
         $processedFullPath = storage_path("app/public/{$processedDir}/{$filename}");
 
-        // Garante que o diretório processado exista
         if (!file_exists(storage_path("app/public/{$processedDir}"))) {
             mkdir(storage_path("app/public/{$processedDir}"), 0755, true);
         }
 
-        // Qualidade 80 (Sintaxe V2)
-        $image->save($processedFullPath, 80);
+        // 8. Fallback de salvamento com compressão
+        if (method_exists($image, 'toJpeg')) {
+            $image->toJpeg(80)->save($processedFullPath);
+        } else {
+            $image->save($processedFullPath, 80);
+        }
+
         $processedPath = "{$processedDir}/{$filename}";
 
         return new ProcessedPhotoDTO($originalPath, $processedPath);
