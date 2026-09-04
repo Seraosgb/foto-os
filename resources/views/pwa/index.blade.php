@@ -99,5 +99,5 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('js/report-flow.js') }}"></script>
+<script src="{{ asset('js/report-flow.js') }}?v={{ time() }}"></script>
 @endpush
