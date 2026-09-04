@@ -1,3 +1,49 @@
+// Função Turbo para comprimir a imagem no celular antes do upload (Fora do Alpine para não pesar a reatividade)
+async function compressImage(file, maxDimension = 1920, quality = 0.9) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                // Calcula a nova dimensão mantendo a proporção (Máximo de 1920px)
+                if (width > height) {
+                    if (width > maxDimension) {
+                        height *= maxDimension / width;
+                        width = maxDimension;
+                    }
+                } else {
+                    if (height > maxDimension) {
+                        width *= maxDimension / height;
+                        height = maxDimension;
+                    }
+                }
+
+                // Desenha a imagem redimensionada no Canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Converte de volta para File (JPEG com a qualidade definida)
+                canvas.toBlob((blob) => {
+                    resolve(new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    }));
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = (error) => reject(error);
+        };
+        reader.onerror = (error) => reject(error);
+    });
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.data('reportFlow', () => ({
         step: 1, // 1: Dados OS, 2: Captura de Fotos, 3: Finalização
@@ -73,13 +119,23 @@ document.addEventListener('alpine:init', () => {
         },
 
         async handlePhotoCapture(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+            const rawFile = event.target.files[0];
+            if (!rawFile) return;
 
             this.loading = true;
             this.errorMessage = '';
 
-            // Obtenção das coordenadas de GPS
+            // COMPRESSÃO TURBO DA IMAGEM
+            let fileToSend = rawFile;
+            try {
+                fileToSend = await compressImage(rawFile, 1920, 0.9);
+                console.log(`Original: ${(rawFile.size / 1024 / 1024).toFixed(2)} MB`);
+                console.log(`Comprimida: ${(fileToSend.size / 1024 / 1024).toFixed(2)} MB`);
+            } catch (error) {
+                console.warn('Falha na compressão, enviando a original por precaução', error);
+            }
+
+            // Obtenção das coordenadas de GPS REAIS
             let lat = null;
             let lng = null;
 
@@ -89,11 +145,10 @@ document.addEventListener('alpine:init', () => {
                 lng = position.coords.longitude;
             } catch (posError) {
                 console.warn('GPS indisponível ou negado:', posError);
-                // Fallback automático para não travar o desenvolvimento no PC
-                // Coordenadas simuladas
+                // Fallback automático para não travar no PC
                 lat = -22.7641;
                 lng = -43.3994;
-                alert('Aviso de Dev: Usando coordenadas simuladas pois o acesso ao GPS foi negado.');
+                alert('Aviso: Não foi possível obter o GPS real. Coordenadas de contingência ativadas. Verifique a permissão do seu navegador.');
             }
 
             if (!lat || !lng) {
@@ -104,7 +159,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             const formData = new FormData();
-            formData.append('photo', file);
+            formData.append('photo', fileToSend); // Enviando o arquivo comprimido!
             formData.append('latitude', lat);
             formData.append('longitude', lng);
             formData.append('observation', '');
@@ -124,7 +179,7 @@ document.addEventListener('alpine:init', () => {
                     // Fallback Offline: Salva Blob da imagem no IndexedDB
                     await OfflineStore.savePendingPhoto({
                         report_client_id: this.reportId,
-                        blob: file,
+                        blob: fileToSend,
                         latitude: lat,
                         longitude: lng,
                         created_at: new Date().toISOString()
@@ -133,7 +188,7 @@ document.addEventListener('alpine:init', () => {
                     // Preview local usando URL temporária
                     this.photos.push({
                         id: 'local_' + Date.now(),
-                        url: URL.createObjectURL(file),
+                        url: URL.createObjectURL(fileToSend),
                         address: 'Pendente de sincronização'
                     });
                 }
