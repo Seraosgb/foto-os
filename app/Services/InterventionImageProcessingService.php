@@ -7,8 +7,6 @@ use Illuminate\Http\UploadedFile;
 use App\DTOs\ProcessedPhotoDTO;
 use App\DTOs\AddressDTO;
 use Illuminate\Support\Str;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 
 class InterventionImageProcessingService implements ImageProcessingServiceInterface
 {
@@ -29,31 +27,29 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
         // 1. Salva a imagem original no disco
         $originalPath = $file->storeAs($originalDir, $filename, 'public');
 
-        // 2. Instancia o manager com a classe real do driver exigida na nova arquitetura
-        $manager = new ImageManager(GdDriver::class);
+        // 2. Lê a imagem usando a biblioteca GD nativa do PHP (Bypass completo no Intervention)
+        $imageContent = file_get_contents($file->getPathname());
+        $image = @imagecreatefromstring($imageContent);
 
-        // 3. Lê o arquivo temporário (Fallback Dinâmico de Métodos)
-        if (method_exists($manager, 'read')) {
-            $image = $manager->read($file->getPathname());
-        } elseif (method_exists($manager, 'make')) {
-            $image = $manager->make($file->getPathname());
-        } else {
-            $image = $manager->load($file->getPathname());
+        if (!$image) {
+            throw new \Exception('Falha ao processar a imagem com o motor GD nativo do PHP.');
         }
 
-        // 4. Redimensiona proporcionalmente para no máximo 1280px
-        if (method_exists($image, 'scaleDown')) {
-            $image->scaleDown(1280);
-        } else {
-            $image->resize(1280, null, function ($constraint) {
-                $constraint->aspectRatio();
-                if (method_exists($constraint, 'upsize')) {
-                    $constraint->upsize();
-                }
-            });
+        // 3. Redimensiona proporcionalmente para no máximo 1280px
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        if ($width > 1280) {
+            $newWidth = 1280;
+            $newHeight = (int) floor($height * (1280 / $width));
+
+            $resized = imagecreatetruecolor($newWidth, $newHeight);
+            imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+            imagedestroy($image);
+            $image = $resized;
         }
 
-        // 5. Monta as linhas de evidência da Marca D'água
+        // 4. Monta as linhas de evidência da Marca D'água
         $addressText = $address ? $address->formattedAddress : 'Endereço indisponível ou offline';
         $lines = [
             "OS: {$osNumber} | Data: {$timestamp}",
@@ -61,38 +57,27 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
             "Local: {$addressText}"
         ];
 
-        // 6. Escreve as linhas na imagem
+        // 5. Escreve as linhas na imagem
+        $color = imagecolorallocate($image, 255, 204, 0); // Amarelo #FFCC00
         $y = 30;
+
         foreach ($lines as $line) {
-            $image->text($line, 30, $y, function ($font) {
-                if (method_exists($font, 'file')) {
-                    $font->file(5);
-                }
-                if (method_exists($font, 'color')) {
-                    $font->color('#FFCC00');
-                }
-            });
-            $y += 30;
+            // Converte o charset para a fonte nativa do GD não quebrar a acentuação do endereço
+            $text = mb_convert_encoding($line, 'ISO-8859-1', 'UTF-8');
+            imagestring($image, 5, 30, $y, $text, $color);
+            $y += 25; // Espaçamento entre as linhas
         }
 
-        // 7. Salva a imagem processada no disco
+        // 6. Prepara o diretório de destino
         $processedFullPath = storage_path("app/public/{$processedDir}/{$filename}");
 
         if (!file_exists(storage_path("app/public/{$processedDir}"))) {
             mkdir(storage_path("app/public/{$processedDir}"), 0755, true);
         }
 
-        // 8. Fallback de salvamento com compressão
-        if (method_exists($image, 'toJpeg')) {
-            $encoded = $image->toJpeg(80);
-            if (method_exists($encoded, 'save')) {
-                $encoded->save($processedFullPath);
-            } else {
-                file_put_contents($processedFullPath, (string) $encoded);
-            }
-        } else {
-            $image->save($processedFullPath, 80);
-        }
+        // 7. Salva como JPEG com 80% de qualidade e limpa a memória
+        imagejpeg($image, $processedFullPath, 80);
+        imagedestroy($image);
 
         $processedPath = "{$processedDir}/{$filename}";
 
