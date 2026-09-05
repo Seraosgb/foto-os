@@ -12,4 +12,5 @@ Route::prefix('v1')->group(function () {
     // Controller invocável deve ser passado assim em formato de array:
     Route::post('/reports/{report}/finalize', [FinalizeReportController::class, '__invoke']);
     Route::patch('photos/{photo}', [App\Http\Controllers\Api\PhotoController::class, 'updateObservation']);
+    Route::patch('reports/{report}/photos/reorder', [App\Http\Controllers\Api\PhotoController::class, 'reorder']);
 });

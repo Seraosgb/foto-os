@@ -77,4 +77,19 @@ class PhotoController extends Controller
 
     return response()->json(['message' => 'Observação atualizada com sucesso!'], 200);
 }
+public function reorder(\Illuminate\Http\Request $request, Report $report): \Illuminate\Http\JsonResponse
+{
+    $validated = $request->validate([
+        'order' => ['required', 'array'],
+        'order.*' => ['required', 'uuid'],
+    ]);
+
+    \Illuminate\Support\Facades\DB::transaction(function () use ($report, $validated) {
+        foreach ($validated['order'] as $sequence => $photoId) {
+            $report->photos()->where('id', $photoId)->update(['sequence' => $sequence + 1]);
+        }
+    });
+
+    return response()->json(['message' => 'Ordem das fotografias atualizada com sucesso!'], 200);
+}
 }

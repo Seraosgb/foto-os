@@ -41,6 +41,67 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
         reader.onerror = (error) => reject(error);
     });
 }
+const OfflineStore = {
+    dbPromise: null,
+    init() {
+        if (!this.dbPromise) {
+            this.dbPromise = new Promise((resolve, reject) => {
+                const req = indexedDB.open('FotoOS_DB', 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('pending_reports')) {
+                        db.createObjectStore('pending_reports', { keyPath: 'client_temp_id' });
+                    }
+                    if (!db.objectStoreNames.contains('pending_photos')) {
+                        db.createObjectStore('pending_photos', { autoIncrement: true });
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+        return this.dbPromise;
+    },
+    async savePendingReport(data) {
+        const db = await this.init();
+        return new Promise((res, rej) => {
+            const tx = db.transaction('pending_reports', 'readwrite');
+            tx.objectStore('pending_reports').put(data);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
+    },
+    async savePendingPhoto(data) {
+        const db = await this.init();
+        return new Promise((res, rej) => {
+            const tx = db.transaction('pending_photos', 'readwrite');
+            tx.objectStore('pending_photos').add(data);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
+    },
+    async getPendingReports() {
+        const db = await this.init();
+        return new Promise((res) => {
+            const tx = db.transaction('pending_reports', 'readonly');
+            const req = tx.objectStore('pending_reports').getAll();
+            req.onsuccess = () => res(req.result || []);
+        });
+    },
+    async getPendingPhotos() {
+        const db = await this.init();
+        return new Promise((res) => {
+            const tx = db.transaction('pending_photos', 'readonly');
+            const req = tx.objectStore('pending_photos').getAll();
+            req.onsuccess = () => res(req.result || []);
+        });
+    },
+    async clearSynced(storeName) {
+        const db = await this.init();
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
+    }
+};
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('reportFlow', () => ({
@@ -253,5 +314,58 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
             }
         }
+        init() {
+        window.addEventListener('online', () => {
+            this.syncPendingData();
+        });
+    },
+
+    movePhoto(index, direction) {
+        const targetIndex = index + direction;
+        if (targetIndex < 0 || targetIndex >= this.photos.length) return;
+
+        const item = this.photos.splice(index, 1)[0];
+        this.photos.splice(targetIndex, 0, item);
+
+        if (navigator.onLine && !this.reportId.startsWith('temp_')) {
+            const order = this.photos.map(p => p.id);
+            axios.patch(`/api/v1/reports/${this.reportId}/photos/reorder`, { order });
+        }
+    },
+
+    async syncPendingData() {
+        if (!navigator.onLine) return;
+        const pendingReports = await OfflineStore.getPendingReports();
+
+        for (const rep of pendingReports) {
+            try {
+                const res = await axios.post('/api/v1/reports', {
+                    os_number: rep.os_number,
+                    unit: rep.unit,
+                    sectors: rep.sectors,
+                    technicians: rep.technicians,
+                    history: rep.history
+                });
+                const realId = res.data.data.id;
+
+                // Sincroniza fotos vinculadas
+                const pendingPhotos = await OfflineStore.getPendingPhotos();
+                for (const photo of pendingPhotos) {
+                    if (photo.report_client_id === rep.client_temp_id) {
+                        const formData = new FormData();
+                        formData.append('photo', photo.blob);
+                        formData.append('latitude', photo.latitude);
+                        formData.append('longitude', photo.longitude);
+                        formData.append('observation', photo.observation || '');
+                        await axios.post(`/api/v1/reports/${realId}/photos`, formData);
+                    }
+                }
+            } catch (err) {
+                console.error('Falha na sincronização em lote:', err);
+            }
+        }
+        await OfflineStore.clearSynced('pending_reports');
+        await OfflineStore.clearSynced('pending_photos');
+    }
     }));
 });
