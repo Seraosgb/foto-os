@@ -41,7 +41,7 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
     });
 }
 
-// Armazenamento Offline IndexedDB (Isolado e com AutoIncrement)
+// Armazenamento Offline IndexedDB (Isolado)
 const OfflineStore = {
     dbPromise: null,
     init() {
@@ -109,10 +109,11 @@ function registerReportFlow() {
     if (typeof Alpine === 'undefined') return;
 
     Alpine.data('reportFlow', () => ({
-        step: 1, // 1: Identificação OS, 2: Fotos e Finalização
+        step: 1, // 1: Identificação, 2: Fotos, 3: Sucesso/Conclusão
         loading: false,
         errorMessage: '',
         reportId: null,
+        pdfUrl: null,
 
         // Campos do Formulário
         osNumber: '',
@@ -340,32 +341,54 @@ function registerReportFlow() {
             try {
                 if (navigator.onLine && !this.reportId.startsWith('temp_')) {
                     const res = await axios.post(`/api/v1/reports/${this.reportId}/finalize`);
-                    const pdfUrl = res.data.data.pdf_url;
+                    this.pdfUrl = res.data.data.pdf_url;
+                    this.step = 3; // Transição para tela de conclusão e novos comandos
 
-                    if (navigator.share) {
-                        navigator.share({
-                            title: `Relatório OS ${this.osNumber}`,
-                            text: `Relatório fotográfico finalizado da OS ${this.osNumber}`,
-                            url: pdfUrl
-                        }).catch(() => {
-                            window.location.href = pdfUrl;
-                        });
-                    } else {
-                        window.location.href = pdfUrl;
-                    }
+                    // Dispara abertura automática em aba separada
+                    window.open(this.pdfUrl, '_blank');
                 } else {
-                    alert('Relatório gravado offline. Conecte-se para gerar o PDF.');
+                    alert('Relatório gravado offline. Conecte-se à internet para sincronizar e gerar o PDF definitivo.');
                 }
             } catch (err) {
                 this.errorMessage = err.response?.data?.message || 'Erro ao finalizar relatório.';
             } finally {
                 this.loading = false;
             }
+        },
+
+        shareReport() {
+            if (!this.pdfUrl) return;
+            if (navigator.share) {
+                navigator.share({
+                    title: `Relatório OS ${this.osNumber}`,
+                    text: `Relatório fotográfico concluído da OS ${this.osNumber}`,
+                    url: this.pdfUrl
+                }).catch(() => {
+                    window.open(this.pdfUrl, '_blank');
+                });
+            } else {
+                window.open(this.pdfUrl, '_blank');
+            }
+        },
+
+        resetFlow() {
+            this.step = 1;
+            this.loading = false;
+            this.errorMessage = '';
+            this.reportId = null;
+            this.pdfUrl = null;
+            this.osNumber = '';
+            this.unit = '';
+            this.sectorInput = '';
+            this.sectors = [];
+            this.technicians = '';
+            this.history = '';
+            this.photos = [];
         }
     }));
 }
 
-// Inicialização dupla contra race condition entre Vite e DOM
+// Inicialização dupla contra race condition
 if (window.Alpine) {
     registerReportFlow();
 } else {

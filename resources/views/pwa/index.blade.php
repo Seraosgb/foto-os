@@ -45,8 +45,9 @@
                 <p class="text-[11px] text-gray-400">Manserv Facilities</p>
             </div>
             <div class="flex items-center">
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm"
-                      x-text="step === 1 ? 'Etapa 1 de 2' : 'Etapa 2 de 2'">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                      :class="step === 3 ? 'bg-emerald-600' : 'bg-blue-600'"
+                      x-text="step === 1 ? 'Etapa 1 de 2' : (step === 2 ? 'Etapa 2 de 2' : 'Concluído')">
                     Etapa 1 de 2
                 </span>
             </div>
@@ -126,23 +127,21 @@
                 <!-- Input Invisível -->
                 <input type="file" x-ref="cameraInput" @change="handlePhotoCapture" accept="image/*" capture="environment" class="hidden">
 
-                <!-- Botão Disparador de Câmera com Estilo Blindado -->
+                <!-- Botão Disparador de Câmera -->
                 <button type="button" @click="triggerCamera" :disabled="loading" class="w-full py-5 rounded-xl font-bold flex flex-col items-center justify-center gap-1.5 transition disabled:opacity-50 btn-camera shadow-sm">
                     <span class="text-2xl">📸</span>
                     <span x-show="!loading" class="text-sm font-bold">Tirar Foto com Câmera</span>
                     <span x-show="loading" class="text-xs animate-pulse">Comprimindo e Carimbando...</span>
                 </button>
 
-                <!-- Lista de Fotos com Altura e Botões Sobrepostos Reais -->
+                <!-- Lista de Fotos com Altura Fixada e Controles -->
                 <div class="space-y-4 mt-4">
                     <template x-for="(photo, index) in photos" :key="photo.id">
                         <div class="p-3.5 bg-white border border-gray-300 rounded-xl shadow-sm flex flex-col gap-3">
 
-                            <!-- Visualizador da Imagem com Altura Forçada e Controles -->
                             <div class="relative w-full rounded-lg overflow-hidden border border-gray-200" style="min-height: 240px; height: 260px; background-color: #111827;">
                                 <img :src="photo.url" class="w-full h-full object-cover block" alt="Evidência Fotográfica">
 
-                                <!-- Botões Flutuantes de Subir / Descer Foto -->
                                 <div class="absolute top-2 right-2 flex gap-1 rounded-md p-1 z-20" style="background-color: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.2);">
                                     <button
                                         type="button"
@@ -162,13 +161,11 @@
                                     </button>
                                 </div>
 
-                                <!-- Indicador Numérico -->
                                 <div class="absolute bottom-2 left-2 text-white text-xs font-mono font-semibold px-2.5 py-1 rounded z-20" style="background-color: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.2);">
                                     Foto #<span x-text="index + 1"></span>
                                 </div>
                             </div>
 
-                            <!-- Observação Individual -->
                             <div>
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">
                                     Observação da Foto #<span x-text="index + 1"></span>:
@@ -188,7 +185,6 @@
                     Nenhuma foto capturada nesta OS.
                 </div>
 
-                <!-- Ações Finais: Botão de Finalização com Texto e Cores Explícitas -->
                 <div class="pt-4 border-t border-gray-200 space-y-2">
                     <button
                         type="button"
@@ -205,6 +201,46 @@
                     <button type="button" @click="step = 1" class="w-full py-2 text-xs font-medium text-gray-500 hover:text-gray-900 text-center block transition">
                         &larr; Voltar para os dados da OS
                     </button>
+                </div>
+            </section>
+
+            <!-- ETAPA 3: Ações Pós-Finalização -->
+            <section x-show="step === 3" x-cloak class="space-y-6 text-center py-4">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl font-bold border border-emerald-300 shadow-sm">
+                    ✓
+                </div>
+
+                <div class="space-y-1">
+                    <h2 class="text-lg font-bold text-gray-900">Relatório Concluído!</h2>
+                    <p class="text-xs text-gray-500">
+                        A Ordem de Serviço <strong class="text-gray-800" x-text="osNumber"></strong> foi finalizada e o PDF gerado.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                    <button
+                        type="button"
+                        @click="shareReport"
+                        class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                        <span>📲</span> Enviar / Abrir PDF Novamente
+                    </button>
+
+                    <a
+                        :href="pdfUrl"
+                        target="_blank"
+                        class="w-full py-2.5 px-4 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg font-semibold text-xs transition block text-center shadow-sm">
+                        Visualizar PDF no Navegador
+                    </a>
+                </div>
+
+                <div class="pt-2 border-t border-gray-200">
+                    <button
+                        type="button"
+                        @click="resetFlow"
+                        class="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
+                        <span>＋</span> Iniciar Novo Relatório
+                    </button>
+                    <p class="text-[11px] text-gray-400 mt-2">Os campos serão limpos para uma nova ordem de serviço.</p>
                 </div>
             </section>
 
