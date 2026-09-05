@@ -13,40 +13,47 @@ class FinalizeReportController extends Controller
 {
     public function __invoke(Report $report, ReportPdfService $pdfService): JsonResponse
     {
-$tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id;
+        $tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id;
 
         // 🛡️ Fallback para quando o usuário não estiver logado
         if (empty($tenantId)) {
-            $tenantId = Company::first()?->id;
+            $tenantId = $report->company_id ?? Company::first()?->id;
         }
 
         // 1. Blindagem Multi-Tenant
         if ($report->company_id !== $tenantId) {
             return response()->json(['error' => 'Acesso negado.'], 403);
         }
-        // 2. Busca o ID do status 'Finalizado' no banco de forma dinâmica
+
+        // 2. Busca dinâmica do status 'finalizado'
         $finalizedStatus = DB::table('report_statuses')
             ->where('company_id', $tenantId)
             ->where('slug', 'finalizado')
             ->first();
 
-        // 3. Trava de segurança: já está finalizado?
+        if (!$finalizedStatus) {
+            return response()->json(['error' => 'Status finalizado não configurado para esta empresa.'], 500);
+        }
+
+        // 3. Trava de segurança: já finalizado?
         if ($report->status_id === $finalizedStatus->id) {
             return response()->json(['error' => 'Este relatório já foi finalizado.'], 422);
         }
 
-        // 4. Trava de segurança: tem foto?
-        if ($report->photos()->count() === 0) {
+        // 4. Trava de segurança: consulta direta das fotos ignorando scopes restritivos
+        $photosCount = $report->photos()->withoutGlobalScopes()->count();
+
+        if ($photosCount === 0) {
             return response()->json(['error' => 'O relatório precisa de pelo menos uma foto para ser finalizado.'], 422);
         }
 
-        // 5. Atualiza o banco de dados
+        // 5. Atualiza o relatório
         $report->update([
             'status_id' => $finalizedStatus->id,
             'finalized_at' => now(),
         ]);
 
-        // 6. Chama o motor para gerar o PDF físico no servidor
+        // 6. Gera o PDF
         $pdfPath = $pdfService->generate($report);
 
         return response()->json([
@@ -54,7 +61,7 @@ $tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id;
             'data' => [
                 'id' => $report->id,
                 'os_number' => $report->os_number,
-                'pdf_url' => asset('storage/' . $pdfPath), // Link direto para o arquivo final
+                'pdf_url' => asset('storage/' . $pdfPath),
             ]
         ], 200);
     }
