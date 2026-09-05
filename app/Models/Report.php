@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Report extends Model
 {
-    use HasFactory, BelongsToTenant; // Injeta o controle de Tenant e geração de UUID
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
         'company_id',
@@ -30,7 +30,15 @@ class Report extends Model
     ];
 
     /**
-     * Relação com os Setores (Muitos para Muitos através da tabela pivô)
+     * Relação com a Empresa / Tenant detentor do relatório
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * Relação com os Setores (Muitos para Muitos via report_sectors)
      */
     public function sectors(): BelongsToMany
     {
@@ -58,7 +66,6 @@ class Report extends Model
      */
     public function status(): BelongsTo
     {
-        // Certifique-se de ter um model ReportStatus criado também se for consultá-lo
         return $this->belongsTo(ReportStatus::class, 'status_id');
     }
 }
