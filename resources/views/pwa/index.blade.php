@@ -20,18 +20,19 @@
     <div x-data="reportFlow" class="max-w-lg mx-auto min-h-screen bg-white shadow-xl flex flex-col justify-between">
 
         <!-- Topo / Barra de Status -->
-        <header class="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800">
-            <div>
-                <h1 class="text-base font-bold tracking-wide">FotoOS</h1>
-                <p class="text-[11px] text-slate-400">Manserv Facilities</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-200 border border-slate-700">
-                    <span x-show="step === 1" x-cloak>Etapa 1 de 2</span>
-                    <span x-show="step === 2" x-cloak>Etapa 2 de 2</span>
-                </span>
-            </div>
-        </header>
+        <!-- Topo / Barra de Status com Contraste Garantido -->
+<header class="bg-slate-950 text-white px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800">
+    <div>
+        <h1 class="text-base font-bold tracking-wide text-white">FotoOS</h1>
+        <p class="text-[11px] text-slate-400">Manserv Facilities</p>
+    </div>
+    <div class="flex items-center">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm"
+              x-text="step === 1 ? 'Etapa 1 de 2' : 'Etapa 2 de 2'">
+            Etapa 1 de 2
+        </span>
+    </div>
+</header>
 
         <!-- Mensagens de Notificação / Erro -->
         <div x-show="errorMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-start gap-2 shadow-sm">
@@ -179,7 +180,7 @@
         ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer'
         : 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'">
     <span x-show="!loading">Finalizar Relatório e Gerar PDF</span>
-    <span x-show="loading" x-cloak class="animate-pulse flex items-center gap-1.5 text-white">
+    <span x-show="loading" x-cloak class="a flex items-center gap-1.5 text-white">
         <span>⏳</span> Compilando Documento...
     </span>
 </button>
