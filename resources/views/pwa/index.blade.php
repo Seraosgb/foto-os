@@ -169,10 +169,20 @@
 
                 <!-- Rodapé de Ações -->
                 <div class="pt-4 border-t border-slate-200 space-y-2">
-                    <button type="button" @click="finalize" :disabled="loading || photos.length === 0" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-lg font-bold text-sm shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2">
-                        <span x-show="!loading">Finalizar Relatório e Gerar PDF</span>
-                        <span x-show="loading" class="animate-pulse">Compilando Documento...</span>
-                    </button>
+                    <!-- Botão com contraste garantido -->
+<button
+    type="button"
+    @click="finalize"
+    :disabled="loading || photos.length === 0"
+    class="w-full py-3.5 px-4 rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+    :class="photos.length > 0 && !loading
+        ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer'
+        : 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'">
+    <span x-show="!loading">Finalizar Relatório e Gerar PDF</span>
+    <span x-show="loading" x-cloak class="animate-pulse flex items-center gap-1.5 text-white">
+        <span>⏳</span> Compilando Documento...
+    </span>
+</button>
 
                     <button type="button" @click="step = 1" class="w-full py-2 text-xs font-medium text-slate-500 hover:text-slate-800 text-center block transition">
                         &larr; Voltar para os dados da OS
