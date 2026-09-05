@@ -114,7 +114,14 @@ function registerReportFlow() {
         pdfUrl: null,
         isFinalized: false,
 
-        // Campos
+        // Taxonomias Dinâmicas & Autocomplete
+        availableUnits: [],
+        unitSuggestions: [],
+        sectorSuggestions: [],
+        showUnitDropdown: false,
+        showSectorDropdown: false,
+
+        // Campos do Formulário
         osNumber: '',
         unit: '',
         sectorInput: '',
@@ -123,19 +130,85 @@ function registerReportFlow() {
         history: '',
         photos: [],
 
-        init() {
+        // Debounce da Busca por OS
+        debounceSearchTimer: null,
+
+        async init() {
+            await this.loadTaxonomies();
+
+            this.$watch('unit', () => this.filterUnits());
+            this.$watch('sectorInput', () => this.filterSectors());
+
             window.addEventListener('online', () => {
                 this.syncPendingData();
             });
         },
 
-        async searchOs() {
-            const os = this.osNumber.trim();
+        async loadTaxonomies() {
+            try {
+                const res = await axios.get('/api/v1/taxonomies/units');
+                this.availableUnits = res.data || [];
+            } catch (e) {
+                console.warn('Modo offline: Taxonomias indisponíveis na rede.', e);
+            }
+        },
+
+        filterUnits() {
+            const query = (this.unit || '').trim().toLowerCase();
+            if (!query) {
+                this.unitSuggestions = this.availableUnits.slice(0, 6);
+                return;
+            }
+            this.unitSuggestions = this.availableUnits
+                .filter(u => u.name.toLowerCase().includes(query))
+                .slice(0, 6);
+        },
+
+        selectUnit(item) {
+            this.unit = item.name;
+            this.showUnitDropdown = false;
+            this.filterSectors();
+        },
+
+        filterSectors() {
+            const query = (this.sectorInput || '').trim().toLowerCase();
+            const currentUnitObj = this.availableUnits.find(
+                u => u.name.trim().toLowerCase() === (this.unit || '').trim().toLowerCase()
+            );
+
+            const baseSectors = currentUnitObj && currentUnitObj.sectors ? currentUnitObj.sectors : [];
+
+            if (!query) {
+                this.sectorSuggestions = baseSectors
+                    .filter(s => !this.sectors.includes(s.name))
+                    .slice(0, 6);
+                return;
+            }
+
+            this.sectorSuggestions = baseSectors
+                .filter(s => s.name.toLowerCase().includes(query) && !this.sectors.includes(s.name))
+                .slice(0, 6);
+        },
+
+        onOsInput() {
+            clearTimeout(this.debounceSearchTimer);
+            const os = (this.osNumber || '').trim();
+
             if (!os || os.length < 2) {
                 this.successMessage = '';
                 this.isFinalized = false;
+                this.errorMessage = '';
                 return;
             }
+
+            this.debounceSearchTimer = setTimeout(() => {
+                this.searchOs();
+            }, 600);
+        },
+
+        async searchOs() {
+            const os = this.osNumber.trim();
+            if (!os || os.length < 2) return;
 
             try {
                 const response = await axios.get('/api/v1/reports/search', { params: { os_number: os } });
@@ -144,8 +217,8 @@ function registerReportFlow() {
                     this.reportId = r.id;
                     this.unit = r.unit;
                     this.sectors = r.sectors || [];
-                    this.technicians = r.technicians;
-                    this.history = r.history;
+                    this.technicians = r.technicians || '';
+                    this.history = r.history || '';
                     this.photos = r.photos || [];
 
                     if (r.status_slug === 'finalizado') {
@@ -157,6 +230,7 @@ function registerReportFlow() {
                         this.errorMessage = '';
                         this.successMessage = `OS encontrada! Rascunho recuperado com ${this.photos.length} foto(s).`;
                     }
+                    this.filterSectors();
                 } else {
                     this.successMessage = '';
                     this.isFinalized = false;
@@ -182,16 +256,19 @@ function registerReportFlow() {
             }
         },
 
-        addSector() {
-            const val = this.sectorInput.trim();
+        addSector(sectorName = null) {
+            const val = (sectorName || this.sectorInput || '').trim();
             if (val && !this.sectors.includes(val)) {
                 this.sectors.push(val);
                 this.sectorInput = '';
+                this.showSectorDropdown = false;
+                this.filterSectors();
             }
         },
 
         removeSector(index) {
             this.sectors.splice(index, 1);
+            this.filterSectors();
         },
 
         async startReport() {
@@ -216,6 +293,7 @@ function registerReportFlow() {
                     const response = await axios.post('/api/v1/reports', payload);
                     this.reportId = response.data.data.id;
                     this.step = 2;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
                     const tempId = this.reportId || ('temp_' + Date.now());
                     this.reportId = tempId;
@@ -225,6 +303,7 @@ function registerReportFlow() {
                         created_at: new Date().toISOString()
                     });
                     this.step = 2;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             } catch (err) {
                 this.errorMessage = err.response?.data?.message || 'Falha ao iniciar relatório.';
@@ -263,13 +342,6 @@ function registerReportFlow() {
                 lat = -22.7641;
                 lng = -43.3994;
                 alert('Aviso: GPS real inacessível. Coordenadas de contingência ativadas.');
-            }
-
-            if (!lat || !lng) {
-                this.errorMessage = 'Localização é mandatória para registrar a evidência.';
-                this.loading = false;
-                event.target.value = '';
-                return;
             }
 
             const formData = new FormData();
@@ -393,7 +465,6 @@ function registerReportFlow() {
                     const res = await axios.post(`/api/v1/reports/${this.reportId}/finalize`);
                     this.pdfUrl = res.data.data.pdf_url;
                     this.step = 3;
-                    window.open(this.pdfUrl, '_blank');
                 } else {
                     alert('Relatório gravado offline. Conecte-se à internet para sincronizar e gerar o PDF.');
                 }
@@ -414,6 +485,16 @@ function registerReportFlow() {
                 `Acesse o documento digital:\n${this.pdfUrl}`
             );
             window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+        },
+
+        shareReport() {
+            if (navigator.share && this.pdfUrl) {
+                navigator.share({
+                    title: `Relatório OS ${this.osNumber}`,
+                    text: `Relatório de serviço OS ${this.osNumber} - ${this.unit}`,
+                    url: this.pdfUrl
+                }).catch(() => {});
+            }
         },
 
         resetFlow() {
