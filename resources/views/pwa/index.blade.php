@@ -53,10 +53,23 @@
             </div>
         </header>
 
-        <!-- Notificações de Erro -->
+        <!-- Mensagem de Sucesso / Rascunho Encontrado -->
+        <div x-show="successMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs rounded-lg flex items-center gap-2 shadow-sm font-medium">
+            <span class="text-base">✓</span>
+            <span x-text="successMessage" class="flex-1"></span>
+        </div>
+
+        <!-- Notificações de Erro / Bloqueio -->
         <div x-show="errorMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-red-100 border border-red-400 text-red-700 text-sm rounded-lg flex items-start gap-2 shadow-sm">
             <span class="font-bold text-red-600">!</span>
-            <span x-text="errorMessage" class="flex-1 text-xs leading-relaxed"></span>
+            <div class="flex-1 text-xs leading-relaxed">
+                <span x-text="errorMessage"></span>
+                <div x-show="isFinalized" class="mt-2">
+                    <button type="button" @click="reopenReport" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold transition shadow-sm">
+                        Reabrir Ordem de Serviço
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Conteúdo Principal -->
@@ -66,12 +79,17 @@
             <section x-show="step === 1" x-cloak class="space-y-4">
                 <div class="border-b border-gray-200 pb-3 mb-4">
                     <h2 class="text-base font-bold text-gray-900">Identificação do Serviço</h2>
-                    <p class="text-xs text-gray-500 mt-0.5">Preencha as informações operacionais antes de anexar as fotos.</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Digite o número da OS para buscar ou iniciar novo chamado.</p>
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Número da OS *</label>
-                    <input type="text" x-model="osNumber" placeholder="Ex: 3456789 ou OS-2026-01" class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                    <input
+                        type="text"
+                        x-model="osNumber"
+                        @input.debounce.600ms="searchOs"
+                        placeholder="Ex: 3456789 ou OS-2026-01"
+                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
                 </div>
 
                 <div>
@@ -107,9 +125,13 @@
                 </div>
 
                 <div class="pt-3">
-                    <button type="button" @click="startReport" :disabled="loading" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold text-sm shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2">
+                    <button
+                        type="button"
+                        @click="startReport"
+                        :disabled="loading || isFinalized"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold text-sm shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2">
                         <span x-show="!loading">Avançar para Fotos &rarr;</span>
-                        <span x-show="loading" class="animate-pulse">Iniciando Relatório...</span>
+                        <span x-show="loading" class="animate-pulse">Salvando Dados...</span>
                     </button>
                 </div>
             </section>
@@ -119,26 +141,22 @@
                 <div class="border-b border-gray-200 pb-3 flex items-center justify-between">
                     <div>
                         <h2 class="text-base font-bold text-gray-900">Evidências Fotográficas</h2>
-                        <p class="text-xs text-gray-500">Capture as fotos e adicione as observações técnicas.</p>
+                        <p class="text-xs text-slate-500">Capture as fotos e adicione as observações técnicas.</p>
                     </div>
                     <span class="text-xs font-mono font-bold bg-gray-200 text-gray-800 border border-gray-300 px-2.5 py-1 rounded" x-text="'OS: ' + osNumber"></span>
                 </div>
 
-                <!-- Input Invisível -->
                 <input type="file" x-ref="cameraInput" @change="handlePhotoCapture" accept="image/*" capture="environment" class="hidden">
 
-                <!-- Botão Disparador de Câmera -->
                 <button type="button" @click="triggerCamera" :disabled="loading" class="w-full py-5 rounded-xl font-bold flex flex-col items-center justify-center gap-1.5 transition disabled:opacity-50 btn-camera shadow-sm">
                     <span class="text-2xl">📸</span>
                     <span x-show="!loading" class="text-sm font-bold">Tirar Foto com Câmera</span>
                     <span x-show="loading" class="text-xs animate-pulse">Comprimindo e Carimbando...</span>
                 </button>
 
-                <!-- Lista de Fotos com Altura Fixada e Controles -->
                 <div class="space-y-4 mt-4">
                     <template x-for="(photo, index) in photos" :key="photo.id">
                         <div class="p-3.5 bg-white border border-gray-300 rounded-xl shadow-sm flex flex-col gap-3">
-
                             <div class="relative w-full rounded-lg overflow-hidden border border-gray-200" style="min-height: 240px; height: 260px; background-color: #111827;">
                                 <img :src="photo.url" class="w-full h-full object-cover block" alt="Evidência Fotográfica">
 
@@ -204,7 +222,7 @@
                 </div>
             </section>
 
-            <!-- ETAPA 3: Ações Pós-Finalização -->
+            <!-- ETAPA 3: Conclusão -->
             <section x-show="step === 3" x-cloak class="space-y-6 text-center py-4">
                 <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl font-bold border border-emerald-300 shadow-sm">
                     ✓
@@ -247,7 +265,6 @@
         </main>
     </div>
 
-    <!-- Service Worker -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

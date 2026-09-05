@@ -1,4 +1,3 @@
-// Função para comprimir a imagem no cliente mantendo proporção e nitidez (~1MB)
 async function compressImage(file, maxDimension = 1920, quality = 0.9) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -41,7 +40,6 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
     });
 }
 
-// Armazenamento Offline IndexedDB (Isolado)
 const OfflineStore = {
     dbPromise: null,
     init() {
@@ -104,32 +102,84 @@ const OfflineStore = {
     }
 };
 
-// Componente Alpine.js Unificado
 function registerReportFlow() {
     if (typeof Alpine === 'undefined') return;
 
     Alpine.data('reportFlow', () => ({
-        step: 1, // 1: Identificação, 2: Fotos, 3: Sucesso/Conclusão
+        step: 1,
         loading: false,
         errorMessage: '',
+        successMessage: '',
         reportId: null,
         pdfUrl: null,
+        isFinalized: false,
 
-        // Campos do Formulário
+        // Campos
         osNumber: '',
         unit: '',
         sectorInput: '',
         sectors: [],
         technicians: '',
         history: '',
-
-        // Evidências Fotográficas
         photos: [],
 
         init() {
             window.addEventListener('online', () => {
                 this.syncPendingData();
             });
+        },
+
+        async searchOs() {
+            const os = this.osNumber.trim();
+            if (!os || os.length < 2) {
+                this.successMessage = '';
+                this.isFinalized = false;
+                return;
+            }
+
+            try {
+                const response = await axios.get('/api/v1/reports/search', { params: { os_number: os } });
+                if (response.data.found) {
+                    const r = response.data.data;
+                    this.reportId = r.id;
+                    this.unit = r.unit;
+                    this.sectors = r.sectors || [];
+                    this.technicians = r.technicians;
+                    this.history = r.history;
+                    this.photos = r.photos || [];
+
+                    if (r.status_slug === 'finalizado') {
+                        this.isFinalized = true;
+                        this.successMessage = '';
+                        this.errorMessage = 'Esta OS já foi finalizada. Clique abaixo se desejar reabri-la.';
+                    } else {
+                        this.isFinalized = false;
+                        this.errorMessage = '';
+                        this.successMessage = `OS encontrada! Rascunho recuperado com ${this.photos.length} foto(s).`;
+                    }
+                } else {
+                    this.successMessage = '';
+                    this.isFinalized = false;
+                    this.errorMessage = '';
+                }
+            } catch (err) {
+                console.warn('Erro ao pesquisar OS:', err);
+            }
+        },
+
+        async reopenReport() {
+            if (!this.reportId) return;
+            this.loading = true;
+            this.errorMessage = '';
+            try {
+                await axios.post(`/api/v1/reports/${this.reportId}/reopen`);
+                this.isFinalized = false;
+                this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e avançar para fotos.';
+            } catch (err) {
+                this.errorMessage = err.response?.data?.error || 'Erro ao reabrir OS.';
+            } finally {
+                this.loading = false;
+            }
         },
 
         addSector() {
@@ -167,7 +217,7 @@ function registerReportFlow() {
                     this.reportId = response.data.data.id;
                     this.step = 2;
                 } else {
-                    const tempId = 'temp_' + Date.now();
+                    const tempId = this.reportId || ('temp_' + Date.now());
                     this.reportId = tempId;
                     await OfflineStore.savePendingReport({
                         client_temp_id: tempId,
@@ -342,12 +392,10 @@ function registerReportFlow() {
                 if (navigator.onLine && !this.reportId.startsWith('temp_')) {
                     const res = await axios.post(`/api/v1/reports/${this.reportId}/finalize`);
                     this.pdfUrl = res.data.data.pdf_url;
-                    this.step = 3; // Transição para tela de conclusão e novos comandos
-
-                    // Dispara abertura automática em aba separada
+                    this.step = 3;
                     window.open(this.pdfUrl, '_blank');
                 } else {
-                    alert('Relatório gravado offline. Conecte-se à internet para sincronizar e gerar o PDF definitivo.');
+                    alert('Relatório gravado offline. Conecte-se à internet para sincronizar e gerar o PDF.');
                 }
             } catch (err) {
                 this.errorMessage = err.response?.data?.message || 'Erro ao finalizar relatório.';
@@ -375,8 +423,10 @@ function registerReportFlow() {
             this.step = 1;
             this.loading = false;
             this.errorMessage = '';
+            this.successMessage = '';
             this.reportId = null;
             this.pdfUrl = null;
+            this.isFinalized = false;
             this.osNumber = '';
             this.unit = '';
             this.sectorInput = '';
@@ -388,7 +438,6 @@ function registerReportFlow() {
     }));
 }
 
-// Inicialização dupla contra race condition
 if (window.Alpine) {
     registerReportFlow();
 } else {

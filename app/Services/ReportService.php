@@ -6,7 +6,7 @@ use App\DTOs\StoreReportDTO;
 use App\Models\Report;
 use App\Models\Unit;
 use App\Models\Sector;
-use App\Models\Company; // <--- Importe o Model Company
+use App\Models\Company;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
@@ -14,7 +14,6 @@ class ReportService
 {
     public function createProgressiveReport(StoreReportDTO $dto, ?string $tenantId = null): Report
     {
-        // 🛡️ Fallback de segurança: Se o tenantId vier vazio, pega a primeira empresa do banco (evita erro 1452)
         if (empty($tenantId)) {
             $defaultCompany = Company::first();
             $tenantId = $defaultCompany ? $defaultCompany->id : null;
@@ -25,8 +24,7 @@ class ReportService
         }
 
         return DB::transaction(function () use ($dto, $tenantId) {
-
-            // 1. Resolve a Unidade (Se não for UUID, cria na hora)
+            // 1. Resolve a Unidade
             $unitId = $dto->unit;
             if (!Str::isUuid($unitId)) {
                 $unit = Unit::firstOrCreate(
@@ -36,7 +34,7 @@ class ReportService
                 $unitId = $unit->id;
             }
 
-            // 2. Resolve os Setores (Cria na hora se for texto livre)
+            // 2. Resolve os Setores
             $sectorIds = [];
             foreach ($dto->sectors as $sectorItem) {
                 if (!Str::isUuid($sectorItem)) {
@@ -50,24 +48,37 @@ class ReportService
                 }
             }
 
-            // 3. Busca o Status Dinâmico Inicial (Rascunho)
+            // 3. Status Rascunho / Em Execução
             $status = DB::table('report_statuses')
-                        ->where('company_id', $tenantId)
-                        ->where('slug', 'rascunho')
-                        ->first();
+                ->where('company_id', $tenantId)
+                ->where('slug', 'rascunho')
+                ->first();
 
-            // 4. Cria o Relatório
-            $report = Report::create([
-                'company_id' => $tenantId,
-                'os_number' => $dto->osNumber,
-                'unit_id' => $unitId,
-                'status_id' => $status ? $status->id : null,
-                'history' => $dto->history,
-                'technicians' => $dto->technicians,
-                'server_created_at' => now(),
-            ]);
+            // 4. Cria ou Atualiza (Idempotência por OS)
+            $report = Report::withoutGlobalScopes()
+                ->where('company_id', $tenantId)
+                ->where('os_number', $dto->osNumber)
+                ->first();
 
-            // 5. Anexa os setores
+            if ($report) {
+                $report->update([
+                    'unit_id' => $unitId,
+                    'history' => $dto->history,
+                    'technicians' => $dto->technicians,
+                ]);
+            } else {
+                $report = Report::create([
+                    'company_id' => $tenantId,
+                    'os_number' => $dto->osNumber,
+                    'unit_id' => $unitId,
+                    'status_id' => $status ? $status->id : null,
+                    'history' => $dto->history,
+                    'technicians' => $dto->technicians,
+                    'server_created_at' => now(),
+                ]);
+            }
+
+            // 5. Atualiza setores pivô
             $report->sectors()->sync($sectorIds);
 
             return $report;
