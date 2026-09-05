@@ -27,11 +27,18 @@
             border: 1px solid #dddddd;
             padding: 5px 8px;
             text-align: left;
+            vertical-align: top;
         }
         .meta-table th {
             background-color: #f3f4f6;
             font-weight: bold;
             width: 25%;
+        }
+        .history-box {
+            background-color: #ffffff;
+            line-height: 1.5;
+            font-size: 10.5px;
+            color: #1f2937;
         }
         .photo-card {
             page-break-inside: avoid;
@@ -67,14 +74,14 @@
 <body>
     <table class="table-full header-table">
         <tr>
-            <td style="width: 30%;">
+            <td style="width: 35%;">
                 @if($logoBase64)
                     <img src="{{ $logoBase64 }}" style="max-height: 45px;">
                 @else
                     <h2 style="margin: 0; color: #1e3a8a;">{{ $company->name ?? 'FotoOS' }}</h2>
                 @endif
             </td>
-            <td style="width: 70%; text-align: right;">
+            <td style="width: 65%; text-align: right;">
                 <h3 style="margin: 0;">RELATÓRIO FOTOGRÁFICO DE SERVIÇO</h3>
                 <span style="font-size: 10px; color: #6b7280;">OS Nº: <strong>{{ $report->os_number }}</strong> | Data Oficial: {{ $report->server_created_at->format('d/m/Y H:i') }}</span>
             </td>
@@ -94,12 +101,16 @@
             <th>Status:</th>
             <td>Finalizado</td>
         </tr>
-        @if($report->history)
         <tr>
             <th>Histórico / Escopo:</th>
-            <td colspan="3">{{ $report->history }}</td>
+            <td colspan="3" class="history-box">
+                @if(!empty($report->history))
+                    {!! nl2br(e($report->history)) !!}
+                @else
+                    <span style="color: #9ca3af; font-style: italic;">Nenhum histórico operacional informado.</span>
+                @endif
+            </td>
         </tr>
-        @endif
     </table>
 
     <div style="margin-top: 15px;">
