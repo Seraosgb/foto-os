@@ -80,7 +80,6 @@
             <template x-for="(photo, index) in photos" :key="photo.id">
                 <div class="border rounded-lg p-2 bg-gray-50 text-xs">
                     <img :src="photo.url" class="w-full h-24 object-cover rounded mb-1">
-                    <p class="truncate text-gray-600 font-semibold" x-text="photo.address"></p>
                 </div>
             </template>
         </div>
