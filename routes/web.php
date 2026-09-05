@@ -27,4 +27,7 @@ Route::middleware('auth')->prefix('painel')->group(function () {
         $path = $pdfService->generate($report);
         return response()->file(storage_path('app/public/' . $path));
     });
+    // Retenção & Expurgo (Manual & Adiamento)
+    Route::post('/retencao/executar', [DashboardController::class, 'runRetentionPurge'])->name('admin.retention.run');
+    Route::post('/relatorios/{report}/adiar-expurgo', [DashboardController::class, 'postponePurge'])->name('admin.retention.postpone');
 });

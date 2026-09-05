@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
+use App\Services\RetentionService;
 
 class DashboardController extends Controller
 {
@@ -63,4 +64,19 @@ class DashboardController extends Controller
         $unit->update(['active' => !$unit->active]);
         return back()->with('success', 'Status da unidade alterado com sucesso!');
     }
+    public function runRetentionPurge(RetentionService $retentionService): RedirectResponse
+{
+    $result = $retentionService->purge();
+
+    $msg = "Expurgo executado: {$result['purged_drafts']} rascunhos limpos, {$result['purged_original_photos']} fotos originais removidas, {$result['archived_reports']} relatórios antigos arquivados.";
+
+    return back()->with('success', $msg);
+}
+
+public function postponePurge(Report $report, RetentionService $retentionService): RedirectResponse
+{
+    $retentionService->postponeDraft($report, 30);
+
+    return back()->with('success', "Expurgo da OS {$report->os_number} adiado com sucesso em +30 dias!");
+}
 }
