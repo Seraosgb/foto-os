@@ -1,4 +1,4 @@
-// Função Turbo para comprimir a imagem no dispositivo antes do upload
+// Função para comprimir a imagem no cliente mantendo proporção e nitidez (~1MB)
 async function compressImage(file, maxDimension = 1920, quality = 0.9) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -10,15 +10,14 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
                 let width = img.width;
                 let height = img.height;
 
-                // Redimensionamento proporcional mantendo a proporção (máx 1920px)
                 if (width > height) {
                     if (width > maxDimension) {
-                        height *= maxDimension / width;
+                        height = Math.round(height * (maxDimension / width));
                         width = maxDimension;
                     }
                 } else {
                     if (height > maxDimension) {
-                        width *= maxDimension / height;
+                        width = Math.round(width * (maxDimension / height));
                         height = maxDimension;
                     }
                 }
@@ -42,6 +41,7 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
     });
 }
 
+// Armazenamento Offline IndexedDB (Isolado e com AutoIncrement)
 const OfflineStore = {
     dbPromise: null,
     init() {
@@ -104,14 +104,15 @@ const OfflineStore = {
     }
 };
 
+// Componente Alpine.js Unificado
 function registerReportFlow() {
     if (typeof Alpine === 'undefined') return;
 
     Alpine.data('reportFlow', () => ({
-        step: 1, // 1: Dados OS, 2: Captura de Fotos, 3: Finalização
+        step: 1, // 1: Identificação OS, 2: Fotos e Finalização
         loading: false,
         errorMessage: '',
-        reportId: null, // UUID retornado pela API
+        reportId: null,
 
         // Campos do Formulário
         osNumber: '',
@@ -121,7 +122,7 @@ function registerReportFlow() {
         technicians: '',
         history: '',
 
-        // Fotos
+        // Evidências Fotográficas
         photos: [],
 
         init() {
@@ -192,17 +193,13 @@ function registerReportFlow() {
             this.loading = true;
             this.errorMessage = '';
 
-            // Compressão prévia no cliente
             let fileToSend = rawFile;
             try {
                 fileToSend = await compressImage(rawFile, 1920, 0.9);
-                console.log(`Original: ${(rawFile.size / 1024 / 1024).toFixed(2)} MB`);
-                console.log(`Comprimida: ${(fileToSend.size / 1024 / 1024).toFixed(2)} MB`);
             } catch (error) {
-                console.warn('Falha na compressão, enviando arquivo bruto como fallback', error);
+                console.warn('Falha na compressão client-side:', error);
             }
 
-            // Coleta de coordenadas
             let lat = null;
             let lng = null;
 
@@ -211,14 +208,14 @@ function registerReportFlow() {
                 lat = position.coords.latitude;
                 lng = position.coords.longitude;
             } catch (posError) {
-                console.warn('GPS indisponível ou negado:', posError);
+                console.warn('GPS indisponível:', posError);
                 lat = -22.7641;
                 lng = -43.3994;
-                alert('Aviso: Não foi possível obter o GPS real. Coordenadas de contingência ativadas.');
+                alert('Aviso: GPS real inacessível. Coordenadas de contingência ativadas.');
             }
 
             if (!lat || !lng) {
-                this.errorMessage = 'Acesso à localização é obrigatório para registrar a evidência.';
+                this.errorMessage = 'Localização é mandatória para registrar a evidência.';
                 this.loading = false;
                 event.target.value = '';
                 return;
@@ -239,7 +236,6 @@ function registerReportFlow() {
                     this.photos.push({
                         id: response.data.data.id,
                         url: response.data.data.url,
-                        address: response.data.data.address,
                         observation: ''
                     });
                 } else {
@@ -254,12 +250,11 @@ function registerReportFlow() {
                     this.photos.push({
                         id: 'local_' + Date.now(),
                         url: URL.createObjectURL(fileToSend),
-                        address: 'Pendente de sincronização',
                         observation: ''
                     });
                 }
             } catch (err) {
-                this.errorMessage = err.response?.data?.message || 'Erro ao enviar foto.';
+                this.errorMessage = err.response?.data?.message || 'Erro ao processar envio da foto.';
             } finally {
                 this.loading = false;
                 event.target.value = '';
@@ -269,7 +264,7 @@ function registerReportFlow() {
         getCurrentLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
-                    reject(new Error('Geolocalização não suportada no navegador.'));
+                    reject(new Error('Geolocalização não suportada.'));
                 }
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
@@ -280,14 +275,11 @@ function registerReportFlow() {
         },
 
         async updatePhotoObservation(photoId, observation) {
-            if (photoId.startsWith('local_')) {
-                return;
-            }
-
+            if (photoId.startsWith('local_')) return;
             try {
                 await axios.patch(`/api/v1/photos/${photoId}`, { observation });
             } catch (err) {
-                console.warn('Falha ao salvar observação da foto via patch:', err);
+                console.warn('Falha ao atualizar observação:', err);
             }
         },
 
@@ -353,7 +345,7 @@ function registerReportFlow() {
                     if (navigator.share) {
                         navigator.share({
                             title: `Relatório OS ${this.osNumber}`,
-                            text: `Relatório fotográfico consolidado da OS ${this.osNumber}`,
+                            text: `Relatório fotográfico finalizado da OS ${this.osNumber}`,
                             url: pdfUrl
                         }).catch(() => {
                             window.location.href = pdfUrl;
@@ -362,7 +354,7 @@ function registerReportFlow() {
                         window.location.href = pdfUrl;
                     }
                 } else {
-                    alert('Relatório salvo localmente. Conecte-se à internet para sincronizar e gerar o PDF.');
+                    alert('Relatório gravado offline. Conecte-se para gerar o PDF.');
                 }
             } catch (err) {
                 this.errorMessage = err.response?.data?.message || 'Erro ao finalizar relatório.';
@@ -373,7 +365,7 @@ function registerReportFlow() {
     }));
 }
 
-// Inicialização segura com fallback direto se Alpine já estiver em memória
+// Inicialização dupla contra race condition entre Vite e DOM
 if (window.Alpine) {
     registerReportFlow();
 } else {
