@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Report;
+use App\Models\Company;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -11,13 +12,18 @@ class ReportPdfService
 {
     public function generate(Report $report): string
     {
-        // 1. Garante o carregamento dos relacionamentos blindados
-        $report->load(['photos' => function ($query) {
-            $query->orderBy('sequence', 'asc');
-        }, 'unit', 'sectors']);
+        // 1. Carrega os relacionamentos incluindo a empresa dona do relatório
+        $report->load([
+            'photos' => function ($query) {
+                $query->orderBy('sequence', 'asc');
+            },
+            'unit',
+            'sectors',
+            'company'
+        ]);
 
-        // 2. Resolve a logomarca da empresa vinculada
-        $company = $report->company;
+        // 2. Resolve a empresa do relatório ou assume a matriz padrão como fallback
+        $company = $report->company ?? Company::first();
         $logoBase64 = null;
 
         if ($company && $company->logo_path && Storage::disk('public')->exists($company->logo_path)) {
@@ -26,7 +32,7 @@ class ReportPdfService
             $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode($logoData);
         }
 
-        // 3. Renderiza o HTML estático via DomPDF
+        // 3. Renderiza o HTML via DomPDF
         $pdf = Pdf::loadView('pdf.report', [
             'report' => $report,
             'company' => $company,
@@ -34,7 +40,7 @@ class ReportPdfService
         ])->setPaper('a4', 'portrait')
           ->setWarnings(false);
 
-        // 4. Salva no disco local com UUID para evitar adivinhação
+        // 4. Salva no disco local com UUID para evitar conflitos
         $fileName = 'reports/' . Str::uuid() . '.pdf';
 
         if (!Storage::disk('public')->exists('reports')) {
