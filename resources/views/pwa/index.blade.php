@@ -19,20 +19,19 @@
 
     <div x-data="reportFlow" class="max-w-lg mx-auto min-h-screen bg-white shadow-xl flex flex-col justify-between">
 
-        <!-- Topo / Barra de Status -->
         <!-- Topo / Barra de Status com Contraste Garantido -->
-<header class="bg-slate-950 text-white px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800">
-    <div>
-        <h1 class="text-base font-bold tracking-wide text-white">FotoOS</h1>
-        <p class="text-[11px] text-slate-400">Manserv Facilities</p>
-    </div>
-    <div class="flex items-center">
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm"
-              x-text="step === 1 ? 'Etapa 1 de 2' : 'Etapa 2 de 2'">
-            Etapa 1 de 2
-        </span>
-    </div>
-</header>
+        <header class="bg-slate-950 text-white px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800">
+            <div>
+                <h1 class="text-base font-bold tracking-wide text-white">FotoOS</h1>
+                <p class="text-[11px] text-slate-400">Manserv Facilities</p>
+            </div>
+            <div class="flex items-center">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm"
+                      x-text="step === 1 ? 'Etapa 1 de 2' : 'Etapa 2 de 2'">
+                    Etapa 1 de 2
+                </span>
+            </div>
+        </header>
 
         <!-- Mensagens de Notificação / Erro -->
         <div x-show="errorMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-start gap-2 shadow-sm">
@@ -115,16 +114,16 @@
                     <span x-show="loading" class="text-xs text-emerald-700 animate-pulse">Comprimindo e Carimbando...</span>
                 </button>
 
-                <!-- Grid / Lista de Fotos -->
-                <div class="space-y-3.5 mt-4">
+                <!-- Grid / Lista de Fotos Corrigida com Altura Fixada -->
+                <div class="space-y-4 mt-4">
                     <template x-for="(photo, index) in photos" :key="photo.id">
-                        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col gap-2.5">
+                        <div class="p-3 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col gap-3">
 
-                            <!-- Imagem com Ações de Posição -->
-                            <div class="relative overflow-hidden rounded-lg bg-slate-950 aspect-[4/3]">
-                                <img :src="photo.url" class="w-full h-full object-cover block">
+                            <!-- Container com altura fixa explícita (sem aspect arbitrária) -->
+                            <div class="relative w-full overflow-hidden rounded-lg bg-slate-900 border border-slate-200" style="min-height: 240px; height: 260px;">
+                                <img :src="photo.url" class="w-full h-full object-cover block" alt="Evidência Fotográfica">
 
-                                <div class="absolute top-2 right-2 flex gap-1.5 bg-slate-900/80 rounded-md p-1 backdrop-blur-sm border border-slate-700">
+                                <div class="absolute top-2 right-2 flex gap-1.5 bg-slate-950/80 rounded-md p-1 backdrop-blur-sm border border-slate-700 z-10">
                                     <button
                                         type="button"
                                         @click="movePhoto(index, -1)"
@@ -143,14 +142,14 @@
                                     </button>
                                 </div>
 
-                                <div class="absolute bottom-2 left-2 bg-slate-900/80 text-white text-[10px] font-mono px-2 py-0.5 rounded border border-slate-700">
+                                <div class="absolute bottom-2 left-2 bg-slate-950/80 text-white text-[11px] font-mono px-2 py-0.5 rounded border border-slate-700 z-10">
                                     Evidência #<span x-text="index + 1"></span>
                                 </div>
                             </div>
 
                             <!-- Observação Individual -->
                             <div>
-                                <label class="block text-[11px] font-medium text-slate-600 mb-1">
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">
                                     Observação da Foto #<span x-text="index + 1"></span>:
                                 </label>
                                 <input
@@ -158,7 +157,7 @@
                                     x-model="photo.observation"
                                     @change="updatePhotoObservation(photo.id, photo.observation)"
                                     placeholder="Ex: Disjuntor identificado / Quadro energizado"
-                                    class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition outline-none">
+                                    class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-lg text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition outline-none">
                             </div>
                         </div>
                     </template>
@@ -170,20 +169,19 @@
 
                 <!-- Rodapé de Ações -->
                 <div class="pt-4 border-t border-slate-200 space-y-2">
-                    <!-- Botão com contraste garantido -->
-<button
-    type="button"
-    @click="finalize"
-    :disabled="loading || photos.length === 0"
-    class="w-full py-3.5 px-4 rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
-    :class="photos.length > 0 && !loading
-        ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer'
-        : 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'">
-    <span x-show="!loading">Finalizar Relatório e Gerar PDF</span>
-    <span x-show="loading" x-cloak class="a flex items-center gap-1.5 text-white">
-        <span>⏳</span> Compilando Documento...
-    </span>
-</button>
+                    <button
+                        type="button"
+                        @click="finalize"
+                        :disabled="loading || photos.length === 0"
+                        class="w-full py-3.5 px-4 rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                        :class="photos.length > 0 && !loading
+                            ? 'bg-slate-900 hover:bg-slate-800 text-white cursor-pointer'
+                            : 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'">
+                        <span x-show="!loading">Finalizar Relatório e Gerar PDF</span>
+                        <span x-show="loading" x-cloak class="animate-pulse flex items-center gap-1.5 text-white">
+                            <span>⏳</span> Compilando Documento...
+                        </span>
+                    </button>
 
                     <button type="button" @click="step = 1" class="w-full py-2 text-xs font-medium text-slate-500 hover:text-slate-800 text-center block transition">
                         &larr; Voltar para os dados da OS
