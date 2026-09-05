@@ -9,8 +9,8 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
 
+    <script src="/js/report-flow.js?v={{ time() }}"></script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script src="/js/report-flow.js?v={{ time() }}" defer></script>
 </head>
 <body class="bg-gray-100 text-gray-800 antialiased min-h-screen pb-12">
 
