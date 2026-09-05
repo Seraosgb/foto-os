@@ -32,34 +32,31 @@
             </div>
         @endif
 
-        @if(session('error'))
-            <div class="p-3.5 bg-red-100 border border-red-300 text-red-800 text-xs rounded-xl font-bold">
-                ✕ {{ session('error') }}
+        <!-- Card Exclusivo: Retenção e Limpeza de Disco -->
+        <section class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-3">
+            <div>
+                <h2 class="font-bold text-sm text-gray-900">Políticas de Retenção e Limpeza</h2>
+                <p class="text-xs text-gray-500">Expurgo de rascunhos (>30d), fotos originais (>60d) e arquivamento de OS (>365d).</p>
             </div>
-        @endif
+            <form method="POST" action="/painel/retencao/executar" onsubmit="return confirm('Iniciar checagem e limpeza de arquivos do disco agora?')">
+                @csrf
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Executar Retenção/Expurgo
+                </button>
+            </form>
+        </section>
 
-        <!-- Bloco 1: Identidade da Empresa e Ações Globais -->
+        <!-- Bloco 1: Identidade da Empresa -->
         <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-            <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
-                <h2 class="font-bold text-sm text-gray-900">Dados Cadastrais da Empresa</h2>
-
-                <!-- Botão com Rota Direta -->
-                <form method="POST" action="/painel/retencao/executar" onsubmit="return confirm('Deseja iniciar a checagem e expurgo de arquivos agora?')">
-                    @csrf
-                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                        </svg>
-                        Executar Retenção/Expurgo
-                    </button>
-                </form>
-            </div>
-
+            <h2 class="font-bold text-sm text-gray-900 mb-3">Dados Cadastrais da Empresa</h2>
             <form action="/painel/empresa" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                 @csrf
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Razão Social / Nome de Exibição *</label>
-                    <input type="text" name="name" value="{{ old('name', $company->name) }}" required class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none focus:bg-white focus:ring-2 focus:ring-blue-600 transition">
+                    <input type="text" name="name" value="{{ old('name', $company->name) }}" required class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 mb-1">Logomarca (Substitui o texto no PDF)</label>
@@ -67,7 +64,7 @@
                 </div>
                 <div class="flex items-center gap-4">
                     @if($company->logo_path)
-                        <img src="{{ asset('storage/' . $company->logo_path) }}" class="h-10 border border-gray-300 p-1 rounded bg-white object-contain">
+                        <img src="{{ asset('storage/' . $company->logo_path) }}" class="h-10 border border-gray-300 p-1 rounded bg-white">
                     @endif
                     <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition">
                         Atualizar Empresa
