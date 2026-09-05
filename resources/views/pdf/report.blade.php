@@ -128,7 +128,7 @@
     </div>
 
     <div class="footer">
-        Documento autenticado digitalmente pelo servidor FotoOS em {{ now()->format('d/m/Y H:i:s') }}
+        Documento autenticado digitalmente em {{ now()->format('d/m/Y H:i:s') }}
     </div>
 </body>
 </html>
