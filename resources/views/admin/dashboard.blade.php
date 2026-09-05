@@ -40,11 +40,11 @@
 
         <!-- Bloco 1: Identidade da Empresa e Ações Globais -->
         <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 mb-4 pb-3 border-b border-gray-100">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
                 <h2 class="font-bold text-sm text-gray-900">Dados Cadastrais da Empresa</h2>
 
-                <!-- Botão de Trigger Manual para Retenção e Expurgo -->
-                <form method="POST" action="{{ route('admin.retention.run') }}" onsubmit="return confirm('Deseja iniciar a checagem e expurgo de arquivos agora?')">
+                <!-- Botão com Rota Direta -->
+                <form method="POST" action="/painel/retencao/executar" onsubmit="return confirm('Deseja iniciar a checagem e expurgo de arquivos agora?')">
                     @csrf
                     <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
