@@ -3,77 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Gestão - FotoOS</title>
+    <title>Painel Administrativo - FotoOS</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen">
-    <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold text-gray-900">Painel de Relatórios</h1>
-        <div class="text-sm text-gray-500">
-            Tenant Ativo: <span class="font-semibold text-gray-700">{{ auth()->user()->company->name ?? 'Matriz' }}</span>
+<body class="bg-gray-100 text-gray-800 antialiased min-h-screen">
+
+    <nav class="bg-gray-900 text-white px-6 py-4 flex justify-between items-center shadow-md">
+        <div>
+            <h1 class="font-bold text-lg">FotoOS — Gestão Operacional</h1>
+            <p class="text-xs text-gray-400">{{ $company->name ?? 'Manserv Facilities' }}</p>
         </div>
-    </header>
+        <div class="flex items-center gap-4">
+            <a href="/" target="_blank" class="text-xs text-blue-400 hover:text-blue-300 font-semibold">Abrir PWA de Campo &rarr;</a>
+            <form action="/logout" method="POST">
+                @csrf
+                <button type="submit" class="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-bold transition">
+                    Sair
+                </button>
+            </form>
+        </div>
+    </nav>
 
     <main class="max-w-6xl mx-auto p-6 space-y-6">
-        <!-- Resumo de Taxonomias Dinâmicas -->
-        <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">Unidades Ativas</h2>
-                <div class="text-2xl font-bold text-blue-600">{{ $units->count() }}</div>
-                <p class="text-xs text-gray-400 mt-1">Alimentadas progressivamente via campo</p>
+
+        @if(session('success'))
+            <div class="p-3.5 bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs rounded-xl font-bold">
+                ✓ {{ session('success') }}
             </div>
-            <div class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-2">Total de Setores Mapeados</h2>
-                <div class="text-2xl font-bold text-emerald-600">{{ $units->sum('sectors_count') }}</div>
-                <p class="text-xs text-gray-400 mt-1">Distribuídos entre as unidades</p>
-            </div>
+        @endif
+
+        <!-- Bloco 1: Identidade da Empresa -->
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="font-bold text-sm text-gray-900 mb-3">Dados Cadastrais da Empresa</h2>
+            <form action="/painel/empresa" method="POST" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                @csrf
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Razão Social / Nome de Exibição *</label>
+                    <input type="text" name="name" value="{{ old('name', $company->name) }}" required class="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Logomarca (Substitui o texto no PDF)</label>
+                    <input type="file" name="logo" accept="image/*" class="w-full text-xs text-gray-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
+                </div>
+                <div class="flex items-center gap-4">
+                    @if($company->logo_path)
+                        <img src="{{ asset('storage/' . $company->logo_path) }}" class="h-10 border border-gray-300 p-1 rounded bg-white">
+                    @endif
+                    <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition">
+                        Atualizar Empresa
+                    </button>
+                </div>
+            </form>
         </section>
 
-        <!-- Tabela de Relatórios Emitidos -->
-        <section class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-                <h2 class="font-semibold text-gray-900">Histórico de OS Finalizadas</h2>
+        <!-- Bloco 2: Histórico de Relatórios -->
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-3">
+                <h2 class="font-bold text-sm text-gray-900">Relatórios Emitidos e Rascunhos</h2>
+                <form method="GET" action="/painel" class="flex gap-2">
+                    <input type="text" name="os_number" value="{{ request('os_number') }}" placeholder="Buscar por número da OS..." class="px-3 py-1.5 bg-gray-50 border border-gray-300 rounded-lg text-xs outline-none">
+                    <button type="submit" class="px-3 py-1.5 bg-gray-900 text-white rounded-lg text-xs font-bold">Filtrar</button>
+                </form>
             </div>
+
             <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
-                        <tr>
-                            <th class="px-4 py-3">OS</th>
-                            <th class="px-4 py-3">Unidade</th>
-                            <th class="px-4 py-3">Status</th>
-                            <th class="px-4 py-3">Data Servidor</th>
-                            <th class="px-4 py-3 text-right">Documento</th>
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 border-b border-gray-200 text-gray-600">
+                            <th class="p-3">OS</th>
+                            <th class="p-3">Unidade</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Data Servidor</th>
+                            <th class="p-3 text-right">Ação</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        @forelse($reports as $rep)
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3 font-mono font-medium">{{ $rep->os_number }}</td>
-                                <td class="px-4 py-3">{{ $rep->unit->name ?? 'N/A' }}</td>
-                                <td class="px-4 py-3">
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                        {{ $rep->status->name ?? 'Concluído' }}
+                        @forelse($reports as $r)
+                            <tr class="hover:bg-gray-50/50">
+                                <td class="p-3 font-mono font-bold text-gray-900">{{ $r->os_number }}</td>
+                                <td class="p-3">{{ $r->unit->name ?? 'N/A' }}</td>
+                                <td class="p-3">
+                                    <span class="px-2 py-0.5 rounded-full font-semibold {{ $r->status?->slug === 'finalizado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                                        {{ $r->status->name ?? 'Rascunho' }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-3 text-gray-500">{{ $rep->server_created_at->format('d/m/Y H:i') }}</td>
-                                <td class="px-4 py-3 text-right">
-                                    <a href="{{ asset('storage/reports/' . $rep->id . '.pdf') }}" target="_blank" class="text-blue-600 hover:underline">
-                                        Abrir PDF
+                                <td class="p-3 text-gray-500">{{ $r->server_created_at->format('d/m/Y H:i') }}</td>
+                                <td class="p-3 text-right">
+                                    <a href="/painel/relatorios/{{ $r->id }}/pdf" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold">
+                                        Baixar PDF
                                     </a>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-4 py-6 text-center text-gray-400">Nenhum relatório finalizado registrado até o momento.</td>
+                                <td colspan="5" class="p-4 text-center text-gray-400">Nenhum relatório encontrado.</td>
                             </tr>
                         @endforelse
                     </tbody>
                 </table>
             </div>
-            <div class="p-4 border-t border-gray-200">
+
+            <div>
                 {{ $reports->links() }}
             </div>
         </section>
+
+        <!-- Bloco 3: Gestão de Unidades e Setores -->
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="font-bold text-sm text-gray-900 mb-3">Taxonomias Registradas Progressivamente</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                @foreach($units as $u)
+                    <div class="p-3 bg-gray-50 border border-gray-200 rounded-xl flex justify-between items-center">
+                        <div>
+                            <span class="font-bold text-xs text-gray-800">{{ $u->name }}</span>
+                            <span class="block text-[10px] text-gray-400">{{ $u->sectors_count }} setor(es) vinculados</span>
+                        </div>
+                        <form action="/painel/unidades/{{ $u->id }}/toggle" method="POST">
+                            @csrf
+                            <button type="submit" class="text-[10px] font-bold px-2 py-1 rounded {{ $u->active ? 'bg-emerald-600 text-white' : 'bg-gray-300 text-gray-700' }}">
+                                {{ $u->active ? 'Ativa' : 'Inativa' }}
+                            </button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
     </main>
 </body>
 </html>

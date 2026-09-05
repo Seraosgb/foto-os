@@ -235,18 +235,25 @@
                     </p>
                 </div>
 
-                <div class="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5">
+                    <button
+                        type="button"
+                        @click="shareWhatsapp"
+                        class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                        <span>💬</span> Compartilhar no WhatsApp
+                    </button>
+
                     <button
                         type="button"
                         @click="shareReport"
-                        class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
-                        <span>📲</span> Enviar / Abrir PDF Novamente
+                        class="w-full py-2.5 px-4 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2">
+                        <span>📲</span> Outras Formas de Envio
                     </button>
 
                     <a
                         :href="pdfUrl"
                         target="_blank"
-                        class="w-full py-2.5 px-4 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg font-semibold text-xs transition block text-center shadow-sm">
+                        class="w-full py-2.5 px-4 bg-gray-800 hover:bg-black text-white rounded-lg font-semibold text-xs transition block text-center shadow-sm">
                         Visualizar PDF no Navegador
                     </a>
                 </div>

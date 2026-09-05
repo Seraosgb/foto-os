@@ -8,22 +8,59 @@ use App\Models\Report;
 use App\Models\Unit;
 use App\Models\Sector;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class DashboardController extends Controller
 {
     public function index(Request $request): View
     {
-        $tenantId = auth()->user()?->company_id ?? Company::first()?->id;
+        $tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id ?? Company::first()?->id;
+        $company = Company::find($tenantId) ?? Company::first();
 
-        $reports = Report::withoutGlobalScopes()
+        $query = Report::withoutGlobalScopes()
             ->where('company_id', $tenantId)
-            ->with(['unit', 'status'])
-            ->latest('server_created_at')
-            ->paginate(15);
+            ->with(['unit', 'status', 'sectors'])
+            ->latest('server_created_at');
 
+        if ($request->filled('os_number')) {
+            $query->where('os_number', 'like', '%' . trim($request->os_number) . '%');
+        }
+
+        $reports = $query->paginate(15)->withQueryString();
         $units = Unit::where('company_id', $tenantId)->withCount('sectors')->get();
 
-        return view('admin.dashboard', compact('reports', 'units'));
+        return view('admin.dashboard', compact('reports', 'units', 'company'));
+    }
+
+    public function updateCompany(Request $request): RedirectResponse
+    {
+        $tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id ?? Company::first()?->id;
+        $company = Company::findOrFail($tenantId);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg', 'max:4096'],
+        ]);
+
+        $data = ['name' => $validated['name']];
+
+        if ($request->hasFile('logo')) {
+            if ($company->logo_path && Storage::disk('public')->exists($company->logo_path)) {
+                Storage::disk('public')->delete($company->logo_path);
+            }
+            $data['logo_path'] = $request->file('logo')->store('company', 'public');
+        }
+
+        $company->update($data);
+
+        return back()->with('success', 'Configurações da empresa atualizadas com sucesso!');
+    }
+
+    public function toggleUnit(Unit $unit): RedirectResponse
+    {
+        $unit->update(['active' => !$unit->active]);
+        return back()->with('success', 'Status da unidade alterado com sucesso!');
     }
 }

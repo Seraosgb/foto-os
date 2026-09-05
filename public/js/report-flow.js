@@ -404,19 +404,16 @@ function registerReportFlow() {
             }
         },
 
-        shareReport() {
+        shareWhatsapp() {
             if (!this.pdfUrl) return;
-            if (navigator.share) {
-                navigator.share({
-                    title: `Relatório OS ${this.osNumber}`,
-                    text: `Relatório fotográfico concluído da OS ${this.osNumber}`,
-                    url: this.pdfUrl
-                }).catch(() => {
-                    window.open(this.pdfUrl, '_blank');
-                });
-            } else {
-                window.open(this.pdfUrl, '_blank');
-            }
+            const text = encodeURIComponent(
+                `*RELATÓRIO DE SERVIÇO CONCLUÍDO*\n` +
+                `*OS:* ${this.osNumber}\n` +
+                `*Unidade:* ${this.unit}\n` +
+                `*Setores:* ${this.sectors.join(', ')}\n\n` +
+                `Acesse o documento digital:\n${this.pdfUrl}`
+            );
+            window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
         },
 
         resetFlow() {
