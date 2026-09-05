@@ -67,4 +67,14 @@ class PhotoController extends Controller
             ]
         ], 201);
     }
+    public function updateObservation(\Illuminate\Http\Request $request, \App\Models\Photo $photo): \Illuminate\Http\JsonResponse
+{
+    $validated = $request->validate([
+        'observation' => ['nullable', 'string', 'max:500'],
+    ]);
+
+    $photo->update(['observation' => $validated['observation'] ?? null]);
+
+    return response()->json(['message' => 'Observação atualizada com sucesso!'], 200);
+}
 }
