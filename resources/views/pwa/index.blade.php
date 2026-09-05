@@ -146,14 +146,14 @@
                             x-model="sectorInput"
                             @focus="showSectorDropdown = true; filterSectors()"
                             @input="showSectorDropdown = true"
-                            @keydown.enter.prevent="addSector()"
+                            @keydown.enter.prevent="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
                             placeholder="Digite o setor e selecione ou aperte Enter..."
-                            class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
-                            :disabled="isFinalized"
-                        >
+                         class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                        :disabled="isFinalized"
+                    >
                         <button
                             type="button"
-                            @click="addSector()"
+                            @click="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
                             class="px-4 py-2.5 bg-gray-800 hover:bg-black text-white rounded-lg text-xs font-bold transition">
                             Adicionar
                         </button>
@@ -163,18 +163,18 @@
                     <div
                         x-show="showSectorDropdown && sectorSuggestions.length > 0"
                         x-cloak
-                        class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                     class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
                         <template x-for="item in sectorSuggestions" :key="item.id">
                             <button
                                 type="button"
-                                @click="addSector(item.name)"
+                                @click="addSector(item.name); sectorInput = ''; showSectorDropdown = false;"
                                 class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
                                 <span x-text="item.name"></span>
                                 <span class="text-[10px] text-gray-400">Setor da Unidade</span>
                             </button>
                         </template>
                     </div>
-                </div>
+               </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Técnicos Envolvidos</label>
