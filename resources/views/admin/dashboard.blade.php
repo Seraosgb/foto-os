@@ -33,14 +33,14 @@
         @endif
 
         <!-- Card Exclusivo: Retenção e Limpeza de Disco -->
-        <section class="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-3">
+        <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
                 <h2 class="font-bold text-sm text-gray-900">Políticas de Retenção e Limpeza</h2>
-                <p class="text-xs text-gray-500">Expurgo de rascunhos (>30d), fotos originais (>60d) e arquivamento de OS (>365d).</p>
+                <p class="text-xs text-gray-500 mt-0.5">Expurgo de rascunhos (>30d), fotos originais (>60d) e arquivamento de OS (>365d).</p>
             </div>
-            <form method="POST" action="/painel/retencao/executar" onsubmit="return confirm('Iniciar checagem e limpeza de arquivos do disco agora?')">
+            <form method="POST" action="/painel/retencao/executar" onsubmit="return confirm('Iniciar checagem e limpeza de arquivos do disco agora?')" class="shrink-0">
                 @csrf
-                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                     </svg>
