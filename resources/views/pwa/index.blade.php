@@ -92,24 +92,86 @@
                         class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Unidade *</label>
-                    <input type="text" x-model="unit" placeholder="Ex: Belford Roxo ou Matriz" class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                <!-- CAMPO UNIDADE COM AUTOCOMPLETE INTELIGENTE -->
+                <div class="relative" @click.outside="showUnitDropdown = false">
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        Unidade *
+                    </label>
+                    <input
+                        type="text"
+                        x-model="unit"
+                        @focus="showUnitDropdown = true; filterUnits()"
+                        @input="showUnitDropdown = true"
+                        placeholder="Digite para buscar ou cadastrar..."
+                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                        :disabled="isFinalized"
+                    >
+
+                    <!-- Dropdown Flutuante de Unidades -->
+                    <div
+                        x-show="showUnitDropdown && unitSuggestions.length > 0"
+                        x-cloak
+                        class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        <template x-for="item in unitSuggestions" :key="item.id">
+                            <button
+                                type="button"
+                                @click="selectUnit(item)"
+                                class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
+                                <span x-text="item.name"></span>
+                                <span class="text-[10px] text-gray-400">Existente</span>
+                            </button>
+                        </template>
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Setor(es) *</label>
-                    <div class="flex gap-2">
-                        <input type="text" x-model="sectorInput" @keydown.enter.prevent="addSector" placeholder="Ex: Sala de Máquinas" class="flex-1 px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
-                        <button type="button" @click="addSector" class="bg-gray-800 hover:bg-black text-white px-4 py-2.5 rounded-lg text-sm font-medium transition shadow-sm" style="background-color: #1f2937;">Adicionar</button>
+                <!-- CAMPO SETORES COM TAGS E AUTOCOMPLETE HIERÁRQUICO -->
+                <div class="relative" @click.outside="showSectorDropdown = false">
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        Setores Vinculados *
+                    </label>
+
+                    <!-- Lista de Setores Selecionados (Tags) -->
+                    <div class="flex flex-wrap gap-1.5 mb-2" x-show="sectors.length > 0">
+                        <template x-for="(s, index) in sectors" :key="index">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-md">
+                                <span x-text="s"></span>
+                                <button type="button" @click="removeSector(index)" class="text-blue-500 hover:text-blue-800 font-bold">&times;</button>
+                            </span>
+                        </template>
                     </div>
 
-                    <div class="flex flex-wrap gap-1.5 mt-2.5">
-                        <template x-for="(sec, idx) in sectors" :key="idx">
-                            <span class="inline-flex items-center gap-1.5 bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1 rounded-full border border-blue-200">
-                                <span x-text="sec"></span>
-                                <button type="button" @click="removeSector(idx)" class="text-blue-600 hover:text-red-600 font-bold text-sm leading-none">&times;</button>
-                            </span>
+                    <div class="flex gap-2">
+                        <input
+                            type="text"
+                            x-model="sectorInput"
+                            @focus="showSectorDropdown = true; filterSectors()"
+                            @input="showSectorDropdown = true"
+                            @keydown.enter.prevent="addSector()"
+                            placeholder="Digite o setor e selecione ou aperte Enter..."
+                            class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                            :disabled="isFinalized"
+                        >
+                        <button
+                            type="button"
+                            @click="addSector()"
+                            class="px-4 py-2.5 bg-gray-800 hover:bg-black text-white rounded-lg text-xs font-bold transition">
+                            Adicionar
+                        </button>
+                    </div>
+
+                    <!-- Dropdown Flutuante de Setores -->
+                    <div
+                        x-show="showSectorDropdown && sectorSuggestions.length > 0"
+                        x-cloak
+                        class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        <template x-for="item in sectorSuggestions" :key="item.id">
+                            <button
+                                type="button"
+                                @click="addSector(item.name)"
+                                class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
+                                <span x-text="item.name"></span>
+                                <span class="text-[10px] text-gray-400">Setor da Unidade</span>
+                            </button>
                         </template>
                     </div>
                 </div>
