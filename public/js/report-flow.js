@@ -104,7 +104,9 @@ const OfflineStore = {
     }
 };
 
-document.addEventListener('alpine:init', () => {
+function registerReportFlow() {
+    if (typeof Alpine === 'undefined') return;
+
     Alpine.data('reportFlow', () => ({
         step: 1, // 1: Dados OS, 2: Captura de Fotos, 3: Finalização
         loading: false,
@@ -369,4 +371,11 @@ document.addEventListener('alpine:init', () => {
             }
         }
     }));
-});
+}
+
+// Inicialização segura com fallback direto se Alpine já estiver em memória
+if (window.Alpine) {
+    registerReportFlow();
+} else {
+    document.addEventListener('alpine:init', registerReportFlow);
+}
