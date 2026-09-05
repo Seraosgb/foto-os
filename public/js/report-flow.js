@@ -1,4 +1,4 @@
-// Função Turbo para comprimir a imagem no celular antes do upload (Fora do Alpine para não pesar a reatividade)
+// Função Turbo para comprimir a imagem no dispositivo antes do upload
 async function compressImage(file, maxDimension = 1920, quality = 0.9) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -10,7 +10,7 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
                 let width = img.width;
                 let height = img.height;
 
-                // Calcula a nova dimensão mantendo a proporção (Máximo de 1920px)
+                // Redimensionamento proporcional mantendo a proporção (máx 1920px)
                 if (width > height) {
                     if (width > maxDimension) {
                         height *= maxDimension / width;
@@ -23,14 +23,12 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
                     }
                 }
 
-                // Desenha a imagem redimensionada no Canvas
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Converte de volta para File (JPEG com a qualidade definida)
                 canvas.toBlob((blob) => {
                     resolve(new File([blob], file.name, {
                         type: 'image/jpeg',
@@ -97,7 +95,6 @@ document.addEventListener('alpine:init', () => {
                     this.reportId = response.data.data.id;
                     this.step = 2;
                 } else {
-                    // Fallback Offline: Gera ID temporário de cliente e enfileira
                     const tempId = 'temp_' + Date.now();
                     this.reportId = tempId;
                     await OfflineStore.savePendingReport({
@@ -125,17 +122,17 @@ document.addEventListener('alpine:init', () => {
             this.loading = true;
             this.errorMessage = '';
 
-            // COMPRESSÃO TURBO DA IMAGEM
+            // Compressão prévia no cliente
             let fileToSend = rawFile;
             try {
                 fileToSend = await compressImage(rawFile, 1920, 0.9);
                 console.log(`Original: ${(rawFile.size / 1024 / 1024).toFixed(2)} MB`);
                 console.log(`Comprimida: ${(fileToSend.size / 1024 / 1024).toFixed(2)} MB`);
             } catch (error) {
-                console.warn('Falha na compressão, enviando a original por precaução', error);
+                console.warn('Falha na compressão, enviando arquivo bruto como fallback', error);
             }
 
-            // Obtenção das coordenadas de GPS REAIS
+            // Coleta de coordenadas
             let lat = null;
             let lng = null;
 
@@ -145,10 +142,9 @@ document.addEventListener('alpine:init', () => {
                 lng = position.coords.longitude;
             } catch (posError) {
                 console.warn('GPS indisponível ou negado:', posError);
-                // Fallback automático para não travar no PC
                 lat = -22.7641;
                 lng = -43.3994;
-                alert('Aviso: Não foi possível obter o GPS real. Coordenadas de contingência ativadas. Verifique a permissão do seu navegador.');
+                alert('Aviso: Não foi possível obter o GPS real. Coordenadas de contingência ativadas.');
             }
 
             if (!lat || !lng) {
@@ -159,7 +155,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             const formData = new FormData();
-            formData.append('photo', fileToSend); // Enviando o arquivo comprimido!
+            formData.append('photo', fileToSend);
             formData.append('latitude', lat);
             formData.append('longitude', lng);
             formData.append('observation', '');
@@ -173,10 +169,10 @@ document.addEventListener('alpine:init', () => {
                     this.photos.push({
                         id: response.data.data.id,
                         url: response.data.data.url,
-                        address: response.data.data.address
+                        address: response.data.data.address,
+                        observation: ''
                     });
                 } else {
-                    // Fallback Offline: Salva Blob da imagem no IndexedDB
                     await OfflineStore.savePendingPhoto({
                         report_client_id: this.reportId,
                         blob: fileToSend,
@@ -185,11 +181,11 @@ document.addEventListener('alpine:init', () => {
                         created_at: new Date().toISOString()
                     });
 
-                    // Preview local usando URL temporária
                     this.photos.push({
                         id: 'local_' + Date.now(),
                         url: URL.createObjectURL(fileToSend),
-                        address: 'Pendente de sincronização'
+                        address: 'Pendente de sincronização',
+                        observation: ''
                     });
                 }
             } catch (err) {
@@ -203,7 +199,7 @@ document.addEventListener('alpine:init', () => {
         getCurrentLocation() {
             return new Promise((resolve, reject) => {
                 if (!navigator.geolocation) {
-                    reject(new Error('Geolocalização não suportada.'));
+                    reject(new Error('Geolocalização não suportada no navegador.'));
                 }
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
@@ -211,6 +207,18 @@ document.addEventListener('alpine:init', () => {
                     maximumAge: 0
                 });
             });
+        },
+
+        async updatePhotoObservation(photoId, observation) {
+            if (photoId.startsWith('local_')) {
+                return;
+            }
+
+            try {
+                await axios.patch(`/api/v1/photos/${photoId}`, { observation });
+            } catch (err) {
+                console.warn('Falha ao salvar observação da foto via patch:', err);
+            }
         },
 
         async finalize() {
@@ -223,9 +231,21 @@ document.addEventListener('alpine:init', () => {
             try {
                 if (navigator.onLine && !this.reportId.startsWith('temp_')) {
                     const res = await axios.post(`/api/v1/reports/${this.reportId}/finalize`);
-                    window.location.href = res.data.data.pdf_url;
+                    const pdfUrl = res.data.data.pdf_url;
+
+                    if (navigator.share) {
+                        navigator.share({
+                            title: `Relatório OS ${this.osNumber}`,
+                            text: `Relatório fotográfico consolidado da OS ${this.osNumber}`,
+                            url: pdfUrl
+                        }).catch(() => {
+                            window.location.href = pdfUrl;
+                        });
+                    } else {
+                        window.location.href = pdfUrl;
+                    }
                 } else {
-                    alert('Relatório salvo localmente. Conecte-se à internet para finalizar e gerar o PDF.');
+                    alert('Relatório salvo localmente. Conecte-se à internet para sincronizar e gerar o PDF.');
                 }
             } catch (err) {
                 this.errorMessage = err.response?.data?.message || 'Erro ao finalizar relatório.';
