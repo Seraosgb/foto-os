@@ -333,11 +333,15 @@ document.addEventListener('alpine:init', () => {
             const salvarOffline = async () => {
                 const tempId = this.reportId || ('temp_' + Date.now());
                 this.reportId = tempId;
-                await OfflineStore.savePendingReport({
+
+                // 🛡️ Blindagem contra Proxies do Alpine.js para o IndexedDB
+                const rawData = JSON.parse(JSON.stringify({
                     client_temp_id: tempId,
                     ...payload,
                     created_at: new Date().toISOString()
-                });
+                }));
+
+                await OfflineStore.savePendingReport(rawData);
                 this.errorMessage = '';
                 this.step = 2;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
