@@ -32,7 +32,6 @@
         }
     </style>
 
-    <script src="/js/report-flow.js?v={{ time() }}"></script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="bg-gray-100 text-gray-800 antialiased min-h-screen">
@@ -353,6 +352,12 @@
 
         </main>
     </div>
+
+    <!-- Script do vite carrega o Alpine e o Axios globais primeiro -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    <!-- Por último, carrega o seu arquivo de fluxo PWA -->
+    <script src="/js/report-flow.js?v={{ time() }}"></script>
 
     <script>
         if ('serviceWorker' in navigator) {

@@ -121,9 +121,8 @@ const OfflineStore = {
     }
 };
 
-function registerReportFlow() {
-    if (typeof Alpine === 'undefined') return;
-
+// Aqui utilizamos a abordagem nativa do AlpineJS para registro tardio (Deferred Registration)
+document.addEventListener('alpine:init', () => {
     Alpine.data('reportFlow', () => ({
         step: 1,
         loading: false,
@@ -159,19 +158,11 @@ function registerReportFlow() {
         debounceSearchTimer: null,
 
         async init() {
-            // Se estiver sem internet, ignora a requisição AJAX para não gerar erro
             if (!navigator.onLine) {
                 console.info('Modo Offline: Usando cache ou limitando taxonomias.');
-                return;
+            } else {
+                await this.loadTaxonomies();
             }
-
-            try {
-                const res = await axios.get('/api/taxonomies/units');
-                this.availableUnits = res.data || [];
-            } catch (e) {
-                console.warn('Falha na rede: Taxonomias indisponíveis.', e);
-            }
-            await this.loadTaxonomies();
 
             this.$watch('unit', () => this.filterUnits());
             this.$watch('sectorInput', () => this.filterSectors());
@@ -186,7 +177,6 @@ function registerReportFlow() {
                 this.errorMessage = 'Sem conexão à internet. Operando em modo offline.';
             });
 
-            // Se carregar já conectado, verifica se existem relatórios pendentes
             if (this.isOnline) {
                 this.syncPendingData();
             }
@@ -194,10 +184,11 @@ function registerReportFlow() {
 
         async loadTaxonomies() {
             try {
-                const res = await axios.get('/api/taxonomies/units');
+                // Força o uso do window.axios para evitar quebra no bundle do Vite
+                const res = await window.axios.get('/api/taxonomies/units');
                 this.availableUnits = res.data || [];
             } catch (e) {
-                console.warn('Modo offline: Taxonomias indisponíveis na rede.', e);
+                console.warn('Falha na rede: Taxonomias indisponíveis.', e);
             }
         },
 
@@ -257,14 +248,12 @@ function registerReportFlow() {
         async searchOs() {
             const os = this.osNumber.trim();
 
-            // TRAVA CRÍTICA: Se não houver OS, ou não houver internet,
-            // a busca no servidor NÃO pode ser disparada.
             if (!os || os.length < 2 || !navigator.onLine) {
                 return;
             }
 
             try {
-                const response = await axios.get('/api/reports/search', { params: { os_number: os } });
+                const response = await window.axios.get('/api/reports/search', { params: { os_number: os } });
                 if (response.data.found) {
                     const r = response.data.data;
                     this.reportId = r.id;
@@ -290,7 +279,6 @@ function registerReportFlow() {
                     this.errorMessage = '';
                 }
             } catch (err) {
-                // Se a rede cair EXATAMENTE DURANTE o request, silencia o erro visual na tela
                 console.warn('Erro isolado de rede ao pesquisar OS:', err);
                 this.errorMessage = '';
                 this.successMessage = '';
@@ -302,7 +290,7 @@ function registerReportFlow() {
             this.loading = true;
             this.errorMessage = '';
             try {
-                await axios.post(`/api/reports/${this.reportId}/reopen`);
+                await window.axios.post(`/api/reports/${this.reportId}/reopen`);
                 this.isFinalized = false;
                 this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e capturar mais fotos.';
             } catch (err) {
@@ -344,25 +332,7 @@ function registerReportFlow() {
                 history: this.history
             };
 
-            try {
-                if (navigator.onLine) {
-                    const response = await axios.post('/api/reports', payload);
-                    this.reportId = response.data.data.id;
-                    this.step = 2;
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                } else {
-                    const tempId = this.reportId || ('temp_' + Date.now());
-                    this.reportId = tempId;
-                    await OfflineStore.savePendingReport({
-                        client_temp_id: tempId,
-                        ...payload,
-                        created_at: new Date().toISOString()
-                    });
-                    this.step = 2;
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-            } catch (err) {
-                // Se falhar na rede, faz fallback para armazenamento offline
+            const salvarOffline = async () => {
                 const tempId = this.reportId || ('temp_' + Date.now());
                 this.reportId = tempId;
                 await OfflineStore.savePendingReport({
@@ -370,8 +340,23 @@ function registerReportFlow() {
                     ...payload,
                     created_at: new Date().toISOString()
                 });
+                this.errorMessage = '';
                 this.step = 2;
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            try {
+                if (navigator.onLine) {
+                    const response = await window.axios.post('/api/reports', payload);
+                    this.reportId = response.data.data.id;
+                    this.step = 2;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    await salvarOffline();
+                }
+            } catch (err) {
+                console.warn('Falha de rede ao criar relatório, alternando para offline:', err);
+                await salvarOffline();
             } finally {
                 this.loading = false;
             }
@@ -418,7 +403,7 @@ function registerReportFlow() {
 
             try {
                 if (navigator.onLine && !isTemporary) {
-                    const response = await axios.post(`/api/reports/${this.reportId}/photos`, formData, {
+                    const response = await window.axios.post(`/api/reports/${this.reportId}/photos`, formData, {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
 
@@ -445,7 +430,6 @@ function registerReportFlow() {
                     });
                 }
             } catch (err) {
-                // Fallback de contingência local em erro de transmissão
                 const clientPhotoId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
                 await OfflineStore.savePendingPhoto({
                     client_photo_id: clientPhotoId,
@@ -483,7 +467,7 @@ function registerReportFlow() {
         async updatePhotoObservation(photoId, observation) {
             if (String(photoId).startsWith('local_')) return;
             try {
-                await axios.patch(`/api/photos/${photoId}`, { observation });
+                await window.axios.patch(`/api/photos/${photoId}`, { observation });
             } catch (err) {
                 console.warn('Falha ao atualizar observação:', err);
             }
@@ -499,7 +483,7 @@ function registerReportFlow() {
             const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
             if (navigator.onLine && !isTemporary) {
                 const order = this.photos.map(p => p.id);
-                axios.patch(`/api/reports/${this.reportId}/photos/reorder`, { order });
+                window.axios.patch(`/api/reports/${this.reportId}/photos/reorder`, { order });
             }
         },
 
@@ -518,7 +502,7 @@ function registerReportFlow() {
                 this.syncStatusText = `Sincronizando OS ${rep.os_number} (${i + 1}/${this.syncTotal})...`;
 
                 try {
-                    const res = await axios.post('/api/reports', {
+                    const res = await window.axios.post('/api/reports', {
                         os_number: rep.os_number,
                         unit: rep.unit,
                         sectors: rep.sectors,
@@ -544,7 +528,7 @@ function registerReportFlow() {
                         formData.append('longitude', photo.longitude);
                         formData.append('observation', photo.observation || '');
 
-                        await axios.post(`/api/reports/${realReportId}/photos`, formData, {
+                        await window.axios.post(`/api/reports/${realReportId}/photos`, formData, {
                             headers: { 'Content-Type': 'multipart/form-data' }
                         });
 
@@ -552,7 +536,7 @@ function registerReportFlow() {
                     }
 
                     if (rep.is_finalized) {
-                        await axios.post(`/api/reports/${realReportId}/finalize`);
+                        await window.axios.post(`/api/reports/${realReportId}/finalize`);
                     }
 
                     await OfflineStore.deleteReport(rep.client_temp_id);
@@ -580,7 +564,7 @@ function registerReportFlow() {
 
             try {
                 if (navigator.onLine && !isTemporary) {
-                    const res = await axios.post(`/api/reports/${this.reportId}/finalize`);
+                    const res = await window.axios.post(`/api/reports/${this.reportId}/finalize`);
                     this.pdfUrl = res.data.data.pdf_url;
                     this.step = 3;
                 } else {
@@ -641,10 +625,4 @@ function registerReportFlow() {
             this.photos = [];
         }
     }));
-}
-
-if (window.Alpine) {
-    registerReportFlow();
-} else {
-    document.addEventListener('alpine:init', registerReportFlow);
-}
+});

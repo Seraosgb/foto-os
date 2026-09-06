@@ -8316,10 +8316,13 @@ Disallow:
 ARQUIVO: C:\Projetos\reports\foto-os\public\sw.js
 ========================================
 
-const CACHE_NAME = 'foto-os-v1';
+const CACHE_NAME = 'foto-os-v2';
+
 const ASSETS_TO_CACHE = [
     '/',
-    '/manifest.json'
+    '/manifest.json',
+    '/favicon.ico',
+    '/js/report-flow.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -8347,14 +8350,49 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Intercepta rotas web para fallback offline da casca visual
+    const url = new URL(event.request.url);
+
+    // 1. Não intercepta chamadas de API (elas são tratadas pelo IndexedDB no report-flow.js)
+    if (url.pathname.startsWith('/api/')) {
+        return;
+    }
+
+    // 2. Requisição de Navegação (Página HTML)
     if (event.request.mode === 'navigate') {
         event.respondWith(
-            fetch(event.request).catch(() => {
-                return caches.match('/');
-            })
+            fetch(event.request)
+                .then((response) => {
+                    // Atualiza o cache da página principal com a versão mais recente
+                    const cloned = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put('/', cloned));
+                    return response;
+                })
+                .catch(() => caches.match('/'))
         );
+        return;
     }
+
+    // 3. Demais Assets (CSS, JS do Vite, Imagens, Fontes): Cache com fallback de rede dinâmico
+    event.respondWith(
+        caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+                return cachedResponse;
+            }
+
+            return fetch(event.request).then((networkResponse) => {
+                if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+                    return networkResponse;
+                }
+
+                const responseToCache = networkResponse.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(event.request, responseToCache);
+                });
+
+                return networkResponse;
+            });
+        })
+    );
 });
 
 
@@ -8407,6 +8445,108 @@ var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],en
 ${n?`Expression: "`+n+`"
 
 `:``}`,t),setTimeout(()=>{throw e},0)}var Ai=!0;function ji(e){let t=Ai;Ai=!1;let n=e();return Ai=t,n}function Mi(e,t,n={}){let r;return V(e,t)(e=>r=e,n),r}function V(...e){return Ni(...e)}var Ni=()=>{};function Pi(e){Ni=e}var Fi;function Ii(e){Fi=e}function Li(e,t){let n={};Ci(n,e);let r=[n,...pi(e)],i=typeof t==`function`?Ri(r,t):Vi(r,t,e);return Ti.bind(null,e,t,i)}function Ri(e,t){return(n=()=>{},{scope:r={},params:i=[],context:a}={})=>{if(!Ai){Hi(n,t,mi([r,...e]),i);return}Hi(n,t.apply(mi([r,...e]),i))}}var zi={};function Bi(e,t){if(zi[e])return zi[e];let n=Object.getPrototypeOf(async function(){}).constructor,r=/^[\n\s]*if.*\(.*\)/.test(e.trim())||/^(let|const)\s/.test(e.trim())?`(async()=>{ ${e} })()`:e,i=(()=>{try{let t=new n([`__self`,`scope`],`with (scope) { __self.result = ${r} }; __self.finished = true; return __self.result;`);return Object.defineProperty(t,"name",{value:`[Alpine] ${e}`}),t}catch(n){return Ei(n,t,e),Promise.resolve()}})();return zi[e]=i,i}function Vi(e,t,n){let r=Bi(t,n);return(i=()=>{},{scope:a={},params:o=[],context:s}={})=>{r.result=void 0,r.finished=!1;let c=mi([a,...e]);if(typeof r==`function`){let e=r.call(s,r,c).catch(e=>Ei(e,n,t));r.finished?(Hi(i,r.result,c,o,n),r.result=void 0):e.then(e=>{Hi(i,e,c,o,n)}).catch(e=>Ei(e,n,t)).finally(()=>r.result=void 0)}}}function Hi(e,t,n,r,i){if(Ai&&typeof t==`function`){let a=t.apply(n,r);a instanceof Promise?a.then(t=>Hi(e,t,n,r)).catch(e=>Ei(e,i,t)):e(a)}else typeof t==`object`&&t instanceof Promise?t.then(t=>e(t)):e(t)}function Ui(...e){return Fi(...e)}function Wi(e,t,n={}){let r={};Ci(r,e);let i=[r,...pi(e)],a=mi([n.scope??{},...i]),o=n.params??[];if(t.includes(`await`)){let e=Object.getPrototypeOf(async function(){}).constructor;return new e([`scope`],`with (scope) { let __result = ${/^[\n\s]*if.*\(.*\)/.test(t.trim())||/^(let|const)\s/.test(t.trim())?`(async()=>{ ${t} })()`:t}; return __result }`).call(n.context,a)}{let e=/^[\n\s]*if.*\(.*\)/.test(t.trim())||/^(let|const)\s/.test(t.trim())?`(()=>{ ${t} })()`:t,r=Function([`scope`],`with (scope) { let __result = ${e}; return __result }`).call(n.context,a);return typeof r==`function`&&Ai?r.apply(a,o):r}}var Gi=`x-`;function Ki(e=``){return Gi+e}function qi(e){Gi=e}var Ji={};function H(e,t){return Ji[e]=t,{before(t){if(!Ji[t]){console.warn(String.raw`Cannot find directive \`${t}\`. \`${e}\` will use the default order of execution`);return}let n=pa.indexOf(t);pa.splice(n>=0?n:pa.indexOf(`DEFAULT`),0,e)}}}function Yi(e){return Object.keys(Ji).includes(e)}function Xi(e,t,n){if(t=Array.from(t),e._x_virtualDirectives){let n=Object.entries(e._x_virtualDirectives).map(([e,t])=>({name:e,value:t})),r=Zi(n);n=n.map(e=>r.find(t=>t.name===e.name)?{name:`x-bind:${e.name}`,value:`"${e.value}"`}:e),t=t.concat(n)}let r={};return t.map(oa((e,t)=>r[e]=t)).filter(la).map(da(r,n)).sort(ma).map(t=>ra(e,t))}function Zi(e){return Array.from(e).map(oa()).filter(e=>!la(e))}var Qi=!1,$i=new Map,ea=Symbol();function ta(e){Qi=!0;let t=Symbol();ea=t,$i.set(t,[]);let n=()=>{for(;$i.get(t).length;)$i.get(t).shift()();$i.delete(t)};e(n),Qi=!1,n()}function na(e){let t=[],n=e=>t.push(e),[r,i]=Vr(e);return t.push(i),[{Alpine:Zo,effect:r,cleanup:n,evaluateLater:V.bind(V,e),evaluate:Mi.bind(Mi,e)},()=>t.forEach(e=>e())]}function ra(e,t){let n=Ji[t.type]||(()=>{}),[r,i]=na(e);Xr(e,t.original,i);let a=()=>{e._x_ignore||e._x_ignoreSelf||(n.inline&&n.inline(e,t,r),n=n.bind(n,e,t,r),Qi?$i.get(ea).push(n):n())};return a.runCleanups=i,a}var ia=(e,t)=>({name:n,value:r})=>(n.startsWith(e)&&(n=n.replace(e,t)),{name:n,value:r}),aa=e=>e;function oa(e=()=>{}){return({name:t,value:n})=>{let{name:r,value:i}=sa.reduce((e,t)=>t(e),{name:t,value:n});return r!==t&&e(r,t),{name:r,value:i}}}var sa=[];function ca(e){sa.push(e)}function la({name:e}){return ua().test(e)}var ua=()=>RegExp(`^${Gi}([^:^.]+)\\b`);function da(e,t){return({name:n,value:r})=>{n===r&&(r=``);let i=n.match(ua()),a=n.match(/:([a-zA-Z0-9\-_:]+)/),o=n.match(/\.[^.\]]+(?=[^\]]*$)/g)||[],s=t||e[n]||n;return{type:i?i[1]:null,value:a?a[1]:null,modifiers:o.map(e=>e.replace(`.`,``)),expression:r,original:s}}}var fa=`DEFAULT`,pa=[`ignore`,`ref`,`id`,`data`,`anchor`,`bind`,`init`,`for`,`model`,`modelable`,`transition`,`show`,`if`,fa,`teleport`];function ma(e,t){let n=pa.indexOf(e.type)===-1?fa:e.type,r=pa.indexOf(t.type)===-1?fa:t.type;return pa.indexOf(n)-pa.indexOf(r)}function ha(e,t){if(typeof ShadowRoot==`function`&&e instanceof ShadowRoot){Array.from(e.children).forEach(e=>ha(e,t));return}let n=!1;if(t(e,()=>n=!0),n)return;let r=e.firstElementChild;for(;r;)ha(r,t,!1),r=r.nextElementSibling}var U=!1;function ga(e,t=()=>{}){return(...n)=>U?t(...n):e(...n)}function _a(e){return(...t)=>U&&e(...t)}var va=[];function ya(e){va.push(e)}function ba(e,t){va.forEach(n=>n(e,t)),U=!0,wa(()=>{K(t,(e,t)=>{t(e,()=>{})})}),U=!1}var xa=!1;function Sa(e,t){t._x_dataStack||=e._x_dataStack,U=!0,xa=!0,wa(()=>{Ca(t)}),U=!1,xa=!1}function Ca(e){let t=!1;K(e,(e,n)=>{ha(e,(e,r)=>{if(t&&Va(e))return r();t=!0,n(e,r)})})}function wa(e){let t=Nr;Br((e,n)=>{let r=t(e);return Pr(r),()=>{}}),e(),Br(t)}var Ta=0;function Ea(e,t){let n=e._x_deferInit;n||(n=e._x_deferInit={pending:0,ownsIgnore:!e._x_ignore,queuedAttributes:new Map},n.ownsIgnore&&(e._x_ignore=!0),Ta++),n.pending++,Promise.resolve(t).catch(t=>{try{Ei(t,e)}catch(e){setTimeout(()=>{throw e},0)}}).then(()=>Da(e,n))}function Da(e,t){t.pending--,!(t.pending>0)&&(ai(),!(t.pending>0)&&e._x_deferInit===t&&(delete e._x_deferInit,t.ownsIgnore&&delete e._x_ignore,Ta--,e.isConnected&&(Aa(t),K(e))))}function Oa(e,t){if(Ta===0)return!1;let n=G(e,e=>e._x_deferInit);return n?(ka(n._x_deferInit,e,t.map(({name:e})=>e)),!0):!1}function ka(e,t,n){let r=e.queuedAttributes.get(t);(!r||r.marker!==t._x_marker)&&(r={marker:t._x_marker,names:new Set},e.queuedAttributes.set(t,r)),n.forEach(e=>r.names.add(e))}function Aa(e){e.queuedAttributes.forEach((e,t)=>{if(!t.isConnected||!t._x_marker||t._x_marker!==e.marker)return;let n=G(t,e=>e._x_deferInit);if(n){ka(n._x_deferInit,t,Array.from(e.names));return}let r=Array.from(e.names).filter(e=>t.hasAttribute(e)).map(e=>({name:e,value:t.getAttribute(e)}));r.length!==0&&Xi(t,r).forEach(e=>e())})}ya((e,t)=>{Ta!==0&&e&&e.nodeType===1&&t&&t.nodeType===1&&G(e,e=>e._x_deferInit)&&(t._x_ignore=!0)});function ja(e,t,n={},r={}){return e.dispatchEvent(new CustomEvent(t,{detail:n,bubbles:!0,composed:!0,cancelable:!0,...r}))}function W(e,...t){console.warn(`Alpine Warning: ${e}`,...t)}var Ma=!1;function Na(){Ma&&W(`Alpine has already been initialized on this page. Calling Alpine.start() more than once can cause problems.`),Ma=!0,document.body||W("Unable to initialize. Trying to load Alpine before `<body>` is available. Did you forget to add `defer` in Alpine's `<script>` tag?"),ja(document,`alpine:init`),ja(document,`alpine:initializing`),ti(),qr(e=>K(e,ha)),Jr(e=>Ga(e)),Yr((e,t)=>{Oa(e,t)||Xi(e,t).forEach(e=>e())}),Array.from(document.querySelectorAll(La().join(`,`))).filter(e=>!Ba(e.parentElement,!0)).forEach(e=>{K(e)}),ja(document,`alpine:initialized`),setTimeout(()=>{Ka()})}var Pa=[],Fa=[];function Ia(){return Pa.map(e=>e())}function La(){return Pa.concat(Fa).map(e=>e())}function Ra(e){Pa.push(e)}function za(e){Fa.push(e)}function Ba(e,t=!1){return G(e,e=>{if((t?La():Ia()).some(t=>e.matches(t)))return!0})}function G(e,t){if(e){if(t(e))return e;if(e._x_teleportBack)return G(e._x_teleportBack,t);if(e.parentNode instanceof ShadowRoot)return G(e.parentNode.host,t);if(e.parentElement)return G(e.parentElement,t)}}function Va(e){return Ia().some(t=>e.matches(t))}var Ha=[];function Ua(e){Ha.push(e)}var Wa=1;function K(e,t=ha,n=()=>{}){G(e,e=>e._x_ignore)||ta(()=>{t(e,(e,t)=>{e._x_marker||(n(e,t),Ha.forEach(n=>n(e,t)),Xi(e,e.attributes).forEach(e=>e()),e._x_ignore||(e._x_marker=Wa++),e._x_ignore&&t())})})}function Ga(e,t=ha){t(e,e=>{Qr(e),Zr(e),delete e._x_marker})}function Ka(){[[`ui`,`dialog`,[`[x-dialog], [x-popover]`]],[`anchor`,`anchor`,[`[x-anchor]`]],[`sort`,`sort`,[`[x-sort]`]]].forEach(([e,t,n])=>{Yi(t)||n.some(t=>{if(document.querySelector(t))return W(`found "${t}", but missing ${e} plugin`),!0})})}var qa=[],Ja=!1;function Ya(e=()=>{}){return queueMicrotask(()=>{Ja||setTimeout(()=>{Xa()})}),new Promise(t=>{qa.push(()=>{e(),t()})})}function Xa(){for(Ja=!1;qa.length;)qa.shift()()}function Za(){Ja=!0}function Qa(e,t){return Array.isArray(t)?eo(e,t.join(` `)):typeof t==`object`&&t?to(e,t):typeof t==`function`?Qa(e,t()):eo(e,t)}function $a(e){return e.split(/\s/).filter(Boolean)}function eo(e,t){return t=t===!0?t=``:t||``,(t=>(e.classList.add(...t),()=>{e.classList.remove(...t)}))((t=>$a(t).filter(t=>!e.classList.contains(t)).filter(Boolean))(t))}function to(e,t){let n=Object.entries(t).flatMap(([e,t])=>t?$a(e):!1).filter(Boolean),r=Object.entries(t).flatMap(([e,t])=>!t&&$a(e)).filter(Boolean),i=[],a=[];return r.forEach(t=>{e.classList.contains(t)&&(e.classList.remove(t),a.push(t))}),n.forEach(t=>{e.classList.contains(t)||(e.classList.add(t),i.push(t))}),()=>{a.forEach(t=>e.classList.add(t)),i.forEach(t=>e.classList.remove(t))}}function no(e,t){return typeof t==`object`&&t?ro(e,t):io(e,t)}function ro(e,t){let n={};return Object.entries(t).forEach(([t,r])=>{n[t]=e.style[t],t.startsWith(`--`)||(t=ao(t)),e.style.setProperty(t,r)}),setTimeout(()=>{e.style.length===0&&e.removeAttribute(`style`)}),()=>{no(e,n)}}function io(e,t){let n=e.getAttribute(`style`,t);return e.setAttribute(`style`,t),()=>{e.setAttribute(`style`,n||``)}}function ao(e){return e.replace(/([a-z])([A-Z])/g,`$1-$2`).toLowerCase()}function oo(e,t=()=>{}){let n=!1;return function(){n?t.apply(this,arguments):(n=!0,e.apply(this,arguments))}}H(`transition`,(e,{value:t,modifiers:n,expression:r},{evaluate:i})=>{typeof r==`function`&&(r=i(r)),r!==!1&&(!r||typeof r==`boolean`?co(e,n,t):so(e,r,t))});function so(e,t,n){lo(e,Qa,``),{enter:t=>{e._x_transition.enter.during=t},"enter-start":t=>{e._x_transition.enter.start=t},"enter-end":t=>{e._x_transition.enter.end=t},leave:t=>{e._x_transition.leave.during=t},"leave-start":t=>{e._x_transition.leave.start=t},"leave-end":t=>{e._x_transition.leave.end=t}}[n](t)}function co(e,t,n){lo(e,no);let r=!t.includes(`in`)&&!t.includes(`out`)&&!n,i=r||t.includes(`in`)||[`enter`].includes(n),a=r||t.includes(`out`)||[`leave`].includes(n);t.includes(`in`)&&!r&&(t=t.filter((e,n)=>n<t.indexOf(`out`))),t.includes(`out`)&&!r&&(t=t.filter((e,n)=>n>t.indexOf(`out`)));let o=!t.includes(`opacity`)&&!t.includes(`scale`),s=o||t.includes(`opacity`),c=o||t.includes(`scale`),l=+!s,u=c?mo(t,`scale`,95)/100:1,d=mo(t,`delay`,0)/1e3,f=mo(t,`origin`,`center`),p=`opacity, transform`,m=mo(t,`duration`,150)/1e3,h=mo(t,`duration`,75)/1e3,g=`cubic-bezier(0.4, 0.0, 0.2, 1)`;i&&(e._x_transition.enter.during={transformOrigin:f,transitionDelay:`${d}s`,transitionProperty:p,transitionDuration:`${m}s`,transitionTimingFunction:g},e._x_transition.enter.start={opacity:l,transform:`scale(${u})`},e._x_transition.enter.end={opacity:1,transform:`scale(1)`}),a&&(e._x_transition.leave.during={transformOrigin:f,transitionDelay:`${d}s`,transitionProperty:p,transitionDuration:`${h}s`,transitionTimingFunction:g},e._x_transition.leave.start={opacity:1,transform:`scale(1)`},e._x_transition.leave.end={opacity:l,transform:`scale(${u})`})}function lo(e,t,n={}){e._x_transition||={enter:{during:n,start:n,end:n},leave:{during:n,start:n,end:n},in(n=()=>{},r=()=>{}){fo(e,t,{during:this.enter.during,start:this.enter.start,end:this.enter.end},n,r)},out(n=()=>{},r=()=>{}){fo(e,t,{during:this.leave.during,start:this.leave.start,end:this.leave.end},n,r)}}}window.Element.prototype._x_toggleAndCascadeWithTransitions=function(e,t,n,r){let i=document.visibilityState===`visible`?requestAnimationFrame:setTimeout,a=()=>i(n);if(t){e._x_transition&&(e._x_transition.enter||e._x_transition.leave)?e._x_transition.enter&&(Object.entries(e._x_transition.enter.during).length||Object.entries(e._x_transition.enter.start).length||Object.entries(e._x_transition.enter.end).length)?e._x_transition.in(n):a():e._x_transition?e._x_transition.in(n):a();return}e._x_hidePromise=e._x_transition?new Promise((t,n)=>{e._x_transition.out(()=>{},()=>t(r)),e._x_transitioning&&e._x_transitioning.beforeCancel(()=>n({isFromCancelledTransition:!0}))}):Promise.resolve(r),queueMicrotask(()=>{let t=uo(e);t?(t._x_hideChildren||=[],t._x_hideChildren.push(e)):i(()=>{let t=e=>{let n=Promise.all([e._x_hidePromise,...(e._x_hideChildren||[]).map(t)]).then(([e])=>e?.());return delete e._x_hidePromise,delete e._x_hideChildren,n};t(e).catch(e=>{if(!e.isFromCancelledTransition)throw e})})})};function uo(e){let t=e.parentNode;if(t)return t._x_hidePromise?t:uo(t)}function fo(e,t,{during:n,start:r,end:i}={},a=()=>{},o=()=>{}){if(e._x_transitioning&&e._x_transitioning.cancel(),Object.keys(n).length===0&&Object.keys(r).length===0&&Object.keys(i).length===0){a(),o();return}let s,c,l;po(e,{start(){s=t(e,r)},during(){c=t(e,n)},before:a,end(){s(),l=t(e,i)},after:o,cleanup(){c(),l()}})}function po(e,t){let n,r,i,a=oo(()=>{z(()=>{n=!0,r||t.before(),i||(t.end(),Xa()),t.after(),e.isConnected&&t.cleanup(),delete e._x_transitioning})});e._x_transitioning={beforeCancels:[],beforeCancel(e){this.beforeCancels.push(e)},cancel:oo(function(){for(;this.beforeCancels.length;)this.beforeCancels.shift()();a()}),finish:a},z(()=>{t.start(),t.during()}),Za(),requestAnimationFrame(()=>{if(n)return;let a=Number(getComputedStyle(e).transitionDuration.replace(/,.*/,``).replace(`s`,``))*1e3,o=Number(getComputedStyle(e).transitionDelay.replace(/,.*/,``).replace(`s`,``))*1e3;a===0&&(a=Number(getComputedStyle(e).animationDuration.replace(`s`,``))*1e3),z(()=>{t.before()}),r=!0,requestAnimationFrame(()=>{n||(z(()=>{t.end()}),Xa(),setTimeout(e._x_transitioning.finish,a+o),i=!0)})})}function mo(e,t,n){if(e.indexOf(t)===-1)return n;let r=e[e.indexOf(t)+1];if(!r||t===`scale`&&isNaN(r))return n;if(t===`duration`||t===`delay`){let e=r.match(/([0-9]+)ms/);if(e)return e[1]}return t===`origin`&&[`top`,`right`,`left`,`center`,`bottom`].includes(e[e.indexOf(t)+2])?[r,e[e.indexOf(t)+2]].join(` `):r}function ho(e,t,n,r=[]){switch(e._x_bindings||=Mr({}),e._x_bindings[t]=n,t=r.includes(`camel`)?wo(t):t,t){case`value`:go(e,n);break;case`style`:vo(e,n);break;case`class`:_o(e,n);break;case`selected`:case`checked`:yo(e,t,n);break;default:bo(e,t,n)}}function go(e,t){if(Fo(e))e.attributes.value===void 0&&(e.value=t);else if(Po(e))Number.isInteger(t)?e.value=t:!Array.isArray(t)&&typeof t!=`boolean`&&![null,void 0].includes(t)?e.value=String(t):e.checked=Array.isArray(t)?t.some(t=>To(t,e.value)):!!t;else if(e.tagName===`SELECT`)Co(e,t);else if(e.tagName===`OPTION`)bo(e,`value`,t);else{if(e.value===t&&(typeof t!=`object`||!t))return;e.value=t===void 0?``:t}}function _o(e,t){e._x_undoAddedClasses&&e._x_undoAddedClasses(),e._x_undoAddedClasses=Qa(e,t)}function vo(e,t){e._x_undoAddedStyles&&e._x_undoAddedStyles(),e._x_undoAddedStyles=no(e,t)}function yo(e,t,n){bo(e,t,n),So(e,t,n)}function bo(e,t,n){[null,void 0,!1].includes(n)&&ko(t)?e.removeAttribute(t):(Oo(t)&&(n=t),Ao(n)&&(n=JSON.stringify(n)),xo(e,t,n))}function xo(e,t,n){e.getAttribute(t)!=n&&e.setAttribute(t,n)}function So(e,t,n){e[t]!==n&&(e[t]=n)}function Co(e,t){let n=[].concat(t).map(e=>e+``);Array.from(e.options).forEach(e=>{e.selected=n.includes(e.value)})}function wo(e){return e.toLowerCase().replace(/-(\w)/g,(e,t)=>t.toUpperCase())}function To(e,t){return e==t}function Eo(e){return[1,`1`,`true`,`on`,`yes`,!0].includes(e)?!0:[0,`0`,`false`,`off`,`no`,!1].includes(e)?!1:e?!!e:null}var Do=new Set(`allowfullscreen.async.autofocus.autoplay.checked.controls.default.defer.disabled.formnovalidate.inert.ismap.itemscope.loop.multiple.muted.nomodule.novalidate.open.playsinline.readonly.required.reversed.selected.shadowrootclonable.shadowrootdelegatesfocus.shadowrootserializable`.split(`.`));function Oo(e){return Do.has(e)}function ko(e){return![`aria-pressed`,`aria-checked`,`aria-expanded`,`aria-selected`].includes(e)}function Ao(e){return typeof e==`object`&&!!e}function jo(e,t,n){return e._x_bindings&&e._x_bindings[t]!==void 0?e._x_bindings[t]:No(e,t,n)}function Mo(e,t,n,r=!0){if(e._x_bindings&&e._x_bindings[t]!==void 0)return e._x_bindings[t];if(e._x_inlineBindings&&e._x_inlineBindings[t]!==void 0){let n=e._x_inlineBindings[t];return n.extract=r,ji(()=>Mi(e,n.expression))}return No(e,t,n)}function No(e,t,n){let r=e.getAttribute(t);return r===null?typeof n==`function`?n():n:r===``?!0:Oo(t)?!![t,`true`].includes(r):r}function Po(e){return e.type===`checkbox`||e.localName===`ui-checkbox`||e.localName===`ui-switch`}function Fo(e){return e.type===`radio`||e.localName===`ui-radio`}function Io(e,t){let n;return function(){let r=this,i=arguments;clearTimeout(n),n=setTimeout(function(){n=null,e.apply(r,i)},t)}}function Lo(e,t){let n;return function(){let r=this,i=arguments;n||(e.apply(r,i),n=!0,setTimeout(()=>n=!1,t))}}function Ro({get:e,set:t},{get:n,set:r}){let i=!0,a,o=Nr(()=>{let o=e(),s=n();if(i)r(zo(o)),i=!1;else{let e=JSON.stringify(o),n=JSON.stringify(s);e===a?e!==n&&t(zo(s)):r(zo(o))}a=JSON.stringify(e()),JSON.stringify(n())});return()=>{Pr(o)}}function zo(e){return typeof e==`object`?JSON.parse(JSON.stringify(e)):e}function Bo(e){(Array.isArray(e)?e:[e]).forEach(e=>e(Zo))}var q={},Vo=!1;function Ho(e,t){if(Vo||=(q=Mr(q),!0),t===void 0)return q[e];q[e]=t,typeof t==`object`&&t&&t._x_interceptor?q[e]=t.initialize(q,e,e,()=>{}):vi(q[e]),typeof t==`object`&&t&&t.hasOwnProperty(`init`)&&typeof t.init==`function`&&q[e].init()}function Uo(){return q}var Wo={};function Go(e,t){let n=typeof t==`function`?t:()=>t;return e instanceof Element?qo(e,n()):(Wo[e]=n,()=>{})}function Ko(e){return Object.entries(Wo).forEach(([t,n])=>{Object.defineProperty(e,t,{get(){return(...e)=>n(...e)}})}),e}function qo(e,t,n){let r=[];for(;r.length;)r.pop()();let i=Object.entries(t).map(([e,t])=>({name:e,value:t})),a=Zi(i);return i=i.map(e=>a.find(t=>t.name===e.name)?{name:`x-bind:${e.name}`,value:`"${e.value}"`}:e),Xi(e,i,n).map(e=>{r.push(e.runCleanups),e()}),()=>{for(;r.length;)r.pop()()}}var Jo={};function Yo(e,t){Jo[e]=t}function Xo(e,t){return Object.entries(Jo).forEach(([n,r])=>{Object.defineProperty(e,n,{get(){return(...e)=>r.bind(t)(...e)},enumerable:!1})}),e}var Zo={get reactive(){return Mr},get release(){return Pr},get effect(){return Nr},get raw(){return Fr},get transaction(){return Ur},version:`3.17.1`,flushAndStopDeferringMutations:li,dontAutoEvaluateFunctions:ji,disableEffectScheduling:Rr,startObservingMutations:ti,stopObservingMutations:ni,setReactivityEngine:zr,onAttributeRemoved:Xr,onAttributesAdded:Yr,closestDataStack:pi,skipDuringClone:ga,onlyDuringClone:_a,addRootSelector:Ra,addInitSelector:za,setErrorHandler:Oi,interceptClone:ya,addScopeToNode:fi,deferMutations:ci,mapAttributes:ca,evaluateLater:V,interceptInit:Ua,initInterceptors:vi,injectMagics:Ci,setEvaluator:Pi,setRawEvaluator:Ii,mergeProxies:mi,extractProp:Mo,findClosest:G,onElRemoved:Jr,closestRoot:Ba,destroyTree:Ga,interceptor:yi,transition:fo,setStyles:no,mutateDom:z,deferInit:Ea,directive:H,entangle:Ro,throttle:Lo,debounce:Io,evaluate:Mi,evaluateRaw:Ui,initTree:K,nextTick:Ya,prefixed:Ki,prefix:qi,plugin:Bo,magic:B,store:Ho,start:Na,clone:Sa,cloneNode:ba,bound:jo,$data:di,watch:Hr,walk:ha,data:Yo,bind:Go};function Qo(e){let t=Object.create(null);for(let n of e.split(`,`))t[n]=1;return e=>e in t}Object.freeze({}),Object.freeze([]);var $o=Object.assign,es=Object.prototype.hasOwnProperty,ts=(e,t)=>es.call(e,t),ns=Array.isArray,rs=e=>cs(e)===`[object Map]`,is=e=>typeof e==`string`,as=e=>typeof e==`symbol`,os=e=>typeof e==`object`&&!!e,ss=Object.prototype.toString,cs=e=>ss.call(e),ls=e=>cs(e).slice(8,-1),us=e=>is(e)&&e!==`NaN`&&e[0]!==`-`&&``+parseInt(e,10)===e,ds=(e=>{let t=Object.create(null);return n=>t[n]||(t[n]=e(n))})(e=>e.charAt(0).toUpperCase()+e.slice(1)),fs=(e,t)=>!Object.is(e,t);function ps(e,...t){console.warn(`[Vue warn] ${e}`,...t)}var J,ms=new WeakSet,hs=class{constructor(e){this.fn=e,this.deps=void 0,this.depsTail=void 0,this.flags=5,this.next=void 0,this.cleanup=void 0,this.scheduler=void 0}pause(){this.flags|=64}resume(){this.flags&64&&(this.flags&=-65,ms.has(this)&&(ms.delete(this),this.trigger()))}notify(){this.flags&2&&!(this.flags&32)||this.flags&8||ys(this)}run(){if(!(this.flags&1))return this.fn();this.flags|=2,Ns(this),Ss(this);let e=J,t=Y;J=this,Y=!0;try{return this.fn()}finally{J!==this&&ps(`Active effect was not restored correctly - this is likely a Vue internal bug.`),Cs(this),J=e,Y=t,this.flags&=-3}}stop(){if(this.flags&1){for(let e=this.deps;e;e=e.nextDep)Es(e);this.deps=this.depsTail=void 0,Ns(this),this.onStop&&this.onStop(),this.flags&=-2}}trigger(){this.flags&64?ms.add(this):this.scheduler?this.scheduler():this.runIfDirty()}runIfDirty(){ws(this)&&this.run()}get dirty(){return ws(this)}},gs=0,_s,vs;function ys(e,t=!1){if(e.flags|=8,t){e.next=vs,vs=e;return}e.next=_s,_s=e}function bs(){gs++}function xs(){if(--gs>0)return;if(vs){let e=vs;for(vs=void 0;e;){let t=e.next;e.next=void 0,e.flags&=-9,e=t}}let e;for(;_s;){let t=_s;for(_s=void 0;t;){let n=t.next;if(t.next=void 0,t.flags&=-9,t.flags&1)try{t.trigger()}catch(t){e||=t}t=n}}if(e)throw e}function Ss(e){for(let t=e.deps;t;t=t.nextDep)t.version=-1,t.prevActiveLink=t.dep.activeLink,t.dep.activeLink=t}function Cs(e){let t,n=e.depsTail,r=n;for(;r;){let e=r.prevDep;r.version===-1?(r===n&&(n=e),Es(r),Ds(r)):t=r,r.dep.activeLink=r.prevActiveLink,r.prevActiveLink=void 0,r=e}e.deps=t,e.depsTail=n}function ws(e){for(let t=e.deps;t;t=t.nextDep)if(t.dep.version!==t.version||t.dep.computed&&(Ts(t.dep.computed)||t.dep.version!==t.version))return!0;return!!e._dirty}function Ts(e){if(e.flags&4&&!(e.flags&16)||(e.flags&=-17,e.globalVersion===Ps)||(e.globalVersion=Ps,!e.isSSR&&e.flags&128&&(!e.deps&&!e._dirty||!ws(e))))return;e.flags|=2;let t=e.dep,n=J,r=Y;J=e,Y=!0;try{Ss(e);let n=e.fn(e._value);(t.version===0||fs(n,e._value))&&(e.flags|=128,e._value=n,t.version++)}catch(e){throw t.version++,e}finally{J=n,Y=r,Cs(e),e.flags&=-3}}function Es(e,t=!1){let{dep:n,prevSub:r,nextSub:i}=e;if(r&&(r.nextSub=i,e.prevSub=void 0),i&&(i.prevSub=r,e.nextSub=void 0),n.subsHead===e&&(n.subsHead=i),n.subs===e&&(n.subs=r,!r&&n.computed)){n.computed.flags&=-5;for(let e=n.computed.deps;e;e=e.nextDep)Es(e,!0)}!t&&!--n.sc&&n.map&&n.map.delete(n.key)}function Ds(e){let{prevDep:t,nextDep:n}=e;t&&(t.nextDep=n,e.prevDep=void 0),n&&(n.prevDep=t,e.nextDep=void 0)}function Os(e,t){e.effect instanceof hs&&(e=e.effect.fn);let n=new hs(e);t&&$o(n,t);try{n.run()}catch(e){throw n.stop(),e}let r=n.run.bind(n);return r.effect=n,r}function ks(e){e.effect.stop()}var Y=!0,As=[];function js(){As.push(Y),Y=!1}function Ms(){let e=As.pop();Y=e===void 0||e}function Ns(e){let{cleanup:t}=e;if(e.cleanup=void 0,t){let e=J;J=void 0;try{t()}finally{J=e}}}var Ps=0,Fs=class{constructor(e,t){this.sub=e,this.dep=t,this.version=t.version,this.nextDep=this.prevDep=this.nextSub=this.prevSub=this.prevActiveLink=void 0}},Is=class{constructor(e){this.computed=e,this.version=0,this.activeLink=void 0,this.subs=void 0,this.map=void 0,this.key=void 0,this.sc=0,this.__v_skip=!0,this.subsHead=void 0}track(e){if(!J||!Y||J===this.computed)return;let t=this.activeLink;if(t===void 0||t.sub!==J)t=this.activeLink=new Fs(J,this),J.deps?(t.prevDep=J.depsTail,J.depsTail.nextDep=t,J.depsTail=t):J.deps=J.depsTail=t,Ls(t);else if(t.version===-1&&(t.version=this.version,t.nextDep)){let e=t.nextDep;e.prevDep=t.prevDep,t.prevDep&&(t.prevDep.nextDep=e),t.prevDep=J.depsTail,t.nextDep=void 0,J.depsTail.nextDep=t,J.depsTail=t,J.deps===t&&(J.deps=e)}return J.onTrack&&J.onTrack($o({effect:J},e)),t}trigger(e){this.version++,Ps++,this.notify(e)}notify(e){bs();try{for(let t=this.subsHead;t;t=t.nextSub)t.sub.onTrigger&&!(t.sub.flags&8)&&t.sub.onTrigger($o({effect:t.sub},e));for(let e=this.subs;e;e=e.prevSub)e.sub.notify()&&e.sub.dep.notify()}finally{xs()}}};function Ls(e){if(e.dep.sc++,e.sub.flags&4){let t=e.dep.computed;if(t&&!e.dep.subs){t.flags|=20;for(let e=t.deps;e;e=e.nextDep)Ls(e)}let n=e.dep.subs;n!==e&&(e.prevSub=n,n&&(n.nextSub=e)),e.dep.subsHead===void 0&&(e.dep.subsHead=e),e.dep.subs=e}}var Rs=new WeakMap,zs=Symbol(`Object iterate`),Bs=Symbol(`Map keys iterate`),Vs=Symbol(`Array iterate`);function X(e,t,n){if(Y&&J){let r=Rs.get(e);r||Rs.set(e,r=new Map);let i=r.get(n);i||(r.set(n,i=new Is),i.map=r,i.key=n),i.track({target:e,type:t,key:n})}}function Hs(e,t,n,r,i,a){let o=Rs.get(e);if(!o){Ps++;return}let s=o=>{o&&o.trigger({target:e,type:t,key:n,newValue:r,oldValue:i,oldTarget:a})};if(bs(),t===`clear`)o.forEach(s);else{let i=ns(e),a=i&&us(n);if(i&&n===`length`){let e=Number(r);o.forEach((t,n)=>{(n===`length`||n===Vs||!as(n)&&n>=e)&&s(t)})}else switch((n!==void 0||o.has(void 0))&&s(o.get(n)),a&&s(o.get(Vs)),t){case`add`:i?a&&s(o.get(`length`)):(s(o.get(zs)),rs(e)&&s(o.get(Bs)));break;case`delete`:i||(s(o.get(zs)),rs(e)&&s(o.get(Bs)));break;case`set`:rs(e)&&s(o.get(zs))}}xs()}function Us(e){let t=$(e);return t===e?t:(X(t,`iterate`,Vs),wc(e)?t:t.map(Ec))}function Ws(e){return X(e=$(e),`iterate`,Vs),e}function Z(e,t){return Cc(e)?Sc(e)?Dc(Ec(t)):Dc(t):Ec(t)}var Gs={__proto__:null,[Symbol.iterator](){return Ks(this,Symbol.iterator,e=>Z(this,e))},concat(...e){return Us(this).concat(...e.map(e=>ns(e)?Us(e):e))},entries(){return Ks(this,`entries`,e=>(e[1]=Z(this,e[1]),e))},every(e,t){return Q(this,`every`,e,t,void 0,arguments)},filter(e,t){return Q(this,`filter`,e,t,e=>e.map(e=>Z(this,e)),arguments)},find(e,t){return Q(this,`find`,e,t,e=>Z(this,e),arguments)},findIndex(e,t){return Q(this,`findIndex`,e,t,void 0,arguments)},findLast(e,t){return Q(this,`findLast`,e,t,e=>Z(this,e),arguments)},findLastIndex(e,t){return Q(this,`findLastIndex`,e,t,void 0,arguments)},forEach(e,t){return Q(this,`forEach`,e,t,void 0,arguments)},includes(...e){return Ys(this,`includes`,e)},indexOf(...e){return Ys(this,`indexOf`,e)},join(e){return Us(this).join(e)},lastIndexOf(...e){return Ys(this,`lastIndexOf`,e)},map(e,t){return Q(this,`map`,e,t,void 0,arguments)},pop(){return Xs(this,`pop`)},push(...e){return Xs(this,`push`,e)},reduce(e,...t){return Js(this,`reduce`,e,t)},reduceRight(e,...t){return Js(this,`reduceRight`,e,t)},shift(){return Xs(this,`shift`)},some(e,t){return Q(this,`some`,e,t,void 0,arguments)},splice(...e){return Xs(this,`splice`,e)},toReversed(){return Us(this).toReversed()},toSorted(e){return Us(this).toSorted(e)},toSpliced(...e){return Us(this).toSpliced(...e)},unshift(...e){return Xs(this,`unshift`,e)},values(){return Ks(this,`values`,e=>Z(this,e))}};function Ks(e,t,n){let r=Ws(e),i=r[t]();return r!==e&&!wc(e)&&(i._next=i.next,i.next=()=>{let e=i._next();return e.done||(e.value=n(e.value)),e}),i}var qs=Array.prototype;function Q(e,t,n,r,i,a){let o=Ws(e),s=o!==e&&!wc(e),c=o[t];if(c!==qs[t]){let t=c.apply(e,a);return s?Ec(t):t}let l=n;o!==e&&(s?l=function(t,r){return n.call(this,Z(e,t),r,e)}:n.length>2&&(l=function(t,r){return n.call(this,t,r,e)}));let u=c.call(o,l,r);return s&&i?i(u):u}function Js(e,t,n,r){let i=Ws(e),a=i!==e&&!wc(e),o=n,s=!1;i!==e&&(a?(s=r.length===0,o=function(t,r,i){return s&&(s=!1,t=Z(e,t)),n.call(this,t,Z(e,r),i,e)}):n.length>3&&(o=function(t,r,i){return n.call(this,t,r,i,e)}));let c=i[t](o,...r);return s?Z(e,c):c}function Ys(e,t,n){let r=$(e);X(r,`iterate`,Vs);let i=r[t](...n);return(i===-1||i===!1)&&Tc(n[0])?(n[0]=$(n[0]),r[t](...n)):i}function Xs(e,t,n=[]){js(),bs();let r=$(e)[t].apply(e,n);return xs(),Ms(),r}var Zs=Qo(`__proto__,__v_isRef,__isVue`),Qs=new Set(Object.getOwnPropertyNames(Symbol).filter(e=>e!==`arguments`&&e!==`caller`).map(e=>Symbol[e]).filter(as));function $s(e){as(e)||(e=String(e));let t=$(this);return X(t,`has`,e),t.hasOwnProperty(e)}var ec=class{constructor(e=!1,t=!1){this._isReadonly=e,this._isShallow=t}get(e,t,n){if(t===`__v_skip`)return e.__v_skip;let r=this._isReadonly,i=this._isShallow;if(t===`__v_isReactive`)return!r;if(t===`__v_isReadonly`)return r;if(t===`__v_isShallow`)return i;if(t===`__v_raw`)return n===(r?i?_c:gc:i?hc:mc).get(e)||Object.getPrototypeOf(e)===Object.getPrototypeOf(n)?e:void 0;let a=ns(e);if(!r){let e;if(a&&(e=Gs[t]))return e;if(t===`hasOwnProperty`)return $s}let o=Reflect.get(e,t,Oc(e)?e:n);if((as(t)?Qs.has(t):Zs(t))||(r||X(e,`get`,t),i))return o;if(Oc(o)){let e=a&&us(t)?o:o.value;return r&&os(e)?bc(e):e}return os(o)?r?bc(o):yc(o):o}},tc=class extends ec{constructor(e=!1){super(!1,e)}set(e,t,n,r){let i=e[t],a=ns(e)&&us(t);if(!this._isShallow){let r=Cc(i);if(!wc(n)&&!Cc(n)&&(i=$(i),n=$(n)),!a&&Oc(i)&&!Oc(n))return r?(ps(`Set operation on key "${String(t)}" failed: target is readonly.`,e[t]),!0):(i.value=n,!0)}let o=a?Number(t)<e.length:ts(e,t),s=Reflect.set(e,t,n,Oc(e)?e:r);return e===$(r)&&s&&(o?fs(n,i)&&Hs(e,`set`,t,n,i):Hs(e,`add`,t,n)),s}deleteProperty(e,t){let n=ts(e,t),r=e[t],i=Reflect.deleteProperty(e,t);return i&&n&&Hs(e,`delete`,t,void 0,r),i}has(e,t){let n=Reflect.has(e,t);return(!as(t)||!Qs.has(t))&&X(e,`has`,t),n}ownKeys(e){return X(e,`iterate`,ns(e)?`length`:zs),Reflect.ownKeys(e)}},nc=class extends ec{constructor(e=!1){super(!0,e)}set(e,t){return ps(`Set operation on key "${String(t)}" failed: target is readonly.`,e),!0}deleteProperty(e,t){return ps(`Delete operation on key "${String(t)}" failed: target is readonly.`,e),!0}},rc=new tc,ic=new nc,ac=e=>e,oc=e=>Reflect.getPrototypeOf(e);function sc(e,t,n){return function(...r){let i=this.__v_raw,a=$(i),o=rs(a),s=e===`entries`||e===Symbol.iterator&&o,c=e===`keys`&&o,l=i[e](...r),u=n?ac:t?Dc:Ec;return!t&&X(a,`iterate`,c?Bs:zs),$o(Object.create(l),{next(){let{value:e,done:t}=l.next();return t?{value:e,done:t}:{value:s?[u(e[0]),u(e[1])]:u(e),done:t}}})}}function cc(e){return function(...t){{let n=t[0]?`on key "${t[0]}" `:``;ps(`${ds(e)} operation ${n}failed: target is readonly.`,$(this))}return e===`delete`?!1:e===`clear`?void 0:this}}function lc(e,t){let n={get(n){let r=this.__v_raw,i=$(r),a=$(n);e||(fs(n,a)&&X(i,`get`,n),X(i,`get`,a));let{has:o}=oc(i),s=t?ac:e?Dc:Ec;if(o.call(i,n))return s(r.get(n));if(o.call(i,a))return s(r.get(a));r!==i&&r.get(n)},get size(){let t=this.__v_raw;return!e&&X($(t),`iterate`,zs),t.size},has(t){let n=this.__v_raw,r=$(n),i=$(t);return e||(fs(t,i)&&X(r,`has`,t),X(r,`has`,i)),t===i?n.has(t):n.has(t)||n.has(i)},forEach(n,r){let i=this,a=i.__v_raw,o=$(a),s=t?ac:e?Dc:Ec;return!e&&X(o,`iterate`,zs),a.forEach((e,t)=>n.call(r,s(e),s(t),i))}};return $o(n,e?{add:cc(`add`),set:cc(`set`),delete:cc(`delete`),clear:cc(`clear`)}:{add(e){let n=$(this),r=oc(n),i=$(e),a=!t&&!wc(e)&&!Cc(e)?i:e;return r.has.call(n,a)||fs(e,a)&&r.has.call(n,e)||fs(i,a)&&r.has.call(n,i)||(n.add(a),Hs(n,`add`,a,a)),this},set(e,n){!t&&!wc(n)&&!Cc(n)&&(n=$(n));let r=$(this),{has:i,get:a}=oc(r),o=i.call(r,e);o?pc(r,i,e):(e=$(e),o=i.call(r,e));let s=a.call(r,e);return r.set(e,n),o?fs(n,s)&&Hs(r,`set`,e,n,s):Hs(r,`add`,e,n),this},delete(e){let t=$(this),{has:n,get:r}=oc(t),i=n.call(t,e);i?pc(t,n,e):(e=$(e),i=n.call(t,e));let a=r?r.call(t,e):void 0,o=t.delete(e);return i&&Hs(t,`delete`,e,void 0,a),o},clear(){let e=$(this),t=e.size!==0,n=rs(e)?new Map(e):new Set(e),r=e.clear();return t&&Hs(e,`clear`,void 0,void 0,n),r}}),[`keys`,`values`,`entries`,Symbol.iterator].forEach(r=>{n[r]=sc(r,e,t)}),n}function uc(e,t){let n=lc(e,t);return(t,r,i)=>r===`__v_isReactive`?!e:r===`__v_isReadonly`?e:r===`__v_raw`?t:Reflect.get(ts(n,r)&&r in t?n:t,r,i)}var dc={get:uc(!1,!1)},fc={get:uc(!0,!1)};function pc(e,t,n){let r=$(n);if(r!==n&&t.call(e,r)){let t=ls(e);ps(`Reactive ${t} contains both the raw and reactive versions of the same object${t===`Map`?` as keys`:``}, which can lead to inconsistencies. Avoid differentiating between the raw and reactive versions of an object and only use the reactive version if possible.`)}}var mc=new WeakMap,hc=new WeakMap,gc=new WeakMap,_c=new WeakMap;function vc(e){switch(e){case`Object`:case`Array`:return 1;case`Map`:case`Set`:case`WeakMap`:case`WeakSet`:return 2;default:return 0}}function yc(e){return Cc(e)?e:xc(e,!1,rc,dc,mc)}function bc(e){return xc(e,!0,ic,fc,gc)}function xc(e,t,n,r,i){if(!os(e))return ps(`value cannot be made ${t?`readonly`:`reactive`}: ${String(e)}`),e;if(e.__v_raw&&!(t&&e.__v_isReactive)||e.__v_skip||!Object.isExtensible(e))return e;let a=i.get(e);if(a)return a;let o=vc(ls(e));if(o===0)return e;let s=new Proxy(e,o===2?r:n);return i.set(e,s),s}function Sc(e){return Cc(e)?Sc(e.__v_raw):!!(e&&e.__v_isReactive)}function Cc(e){return!!(e&&e.__v_isReadonly)}function wc(e){return!!(e&&e.__v_isShallow)}function Tc(e){return e?!!e.__v_raw:!1}function $(e){let t=e&&e.__v_raw;return t?$(t):e}var Ec=e=>os(e)?yc(e):e,Dc=e=>os(e)?bc(e):e;function Oc(e){return e?e.__v_isRef===!0:!1}B(`nextTick`,()=>Ya),B(`dispatch`,e=>ja.bind(ja,e)),B(`watch`,(e,{evaluateLater:t,cleanup:n})=>(e,r)=>{let i=t(e);n(Hr(()=>{let e;return i(t=>e=t),e},r))}),B(`store`,Uo),B(`data`,e=>di(e)),B(`root`,e=>Ba(e)),B(`refs`,e=>(e._x_refs_proxy||=mi(kc(e)),e._x_refs_proxy));function kc(e){let t=[];return G(e,e=>{e._x_refs&&t.push(e._x_refs)}),t}var Ac={};function jc(e){return Ac[e]||(Ac[e]=0),++Ac[e]}function Mc(e,t){return G(e,e=>{if(e._x_ids&&e._x_ids[t])return!0})}function Nc(e,t){e._x_ids||={},e._x_ids[t]||(e._x_ids[t]=jc(t))}B(`id`,(e,{cleanup:t})=>(n,r=null)=>Pc(e,`${n}${r?`-${r}`:``}`,t,()=>{let t=Mc(e,n),i=t?t._x_ids[n]:jc(n);return r?`${n}-${i}-${r}`:`${n}-${i}`})),ya((e,t)=>{e._x_id&&(t._x_id=e._x_id)});function Pc(e,t,n,r){if(e._x_id||={},e._x_id[t])return e._x_id[t];let i=r();return e._x_id[t]=i,n(()=>{delete e._x_id[t]}),i}B(`el`,e=>e),Fc(`Focus`,`focus`,`focus`),Fc(`Persist`,`persist`,`persist`);function Fc(e,t,n){B(t,r=>W(`You can't use [$${t}] without first installing the "${e}" plugin here: https://alpinejs.dev/plugins/${n}`,r))}H(`modelable`,(e,{expression:t},{effect:n,evaluateLater:r,cleanup:i})=>{let a=r(t),o=()=>{let e;return a(t=>e=t),e},s=r(`${t} = __placeholder`),c=e=>s(()=>{},{scope:{__placeholder:e}});c(o()),queueMicrotask(()=>{if(!e._x_model)return;e._x_removeModelListeners.default();let t=e._x_model.get,n=e._x_model.setWithModifiers;i(Ro({get(){return t()},set(e){n(e)}},{get(){return o()},set(e){c(e)}}))})}),H(`teleport`,(e,{modifiers:t,expression:n},{cleanup:r})=>{e.tagName.toLowerCase()!==`template`&&W(`x-teleport can only be used on a <template> tag`,e);let i=Lc(n),a=e.content.cloneNode(!0).firstElementChild;e._x_teleport=a,a._x_teleportBack=e,e.setAttribute(`data-teleport-template`,!0),a.setAttribute(`data-teleport-target`,!0),e._x_forwardEvents&&e._x_forwardEvents.forEach(t=>{a.addEventListener(t,t=>{t.stopPropagation(),e.dispatchEvent(new t.constructor(t.type,t))})}),fi(a,{},e);let o=(e,t,n)=>{n.includes(`prepend`)?t.parentNode.insertBefore(e,t):n.includes(`append`)?t.parentNode.insertBefore(e,t.nextSibling):t.appendChild(e)};z(()=>{ga(()=>{o(a,i,t),K(a)})()}),e._x_teleportPutBack=()=>{let r=Lc(n);z(()=>{o(e._x_teleport,r,t)})},r(()=>z(()=>{a.remove(),Ga(a)}))});var Ic=document.createElement(`div`);function Lc(e){let t=ga(()=>document.querySelector(e),()=>Ic)();return t||W(`Cannot find x-teleport element for selector: "${e}"`),t}var Rc=()=>{};Rc.inline=(e,{modifiers:t},{cleanup:n})=>{t.includes(`self`)?e._x_ignoreSelf=!0:e._x_ignore=!0,n(()=>{t.includes(`self`)?delete e._x_ignoreSelf:delete e._x_ignore})},H(`ignore`,Rc),H(`effect`,ga((e,{expression:t},{effect:n})=>{n(V(e,t))}));function zc(e,t,n,r){let i=e,a=e=>r(e),o={},s=(e,t)=>n=>t(e,n);return n.includes(`dot`)&&(t=Vc(t)),n.includes(`camel`)&&(t=Hc(t)),n.includes(`capture`)&&(o.capture=!0),n.includes(`window`)&&(i=window),n.includes(`document`)&&(i=document),n.includes(`passive`)&&(o.passive=n[n.indexOf(`passive`)+1]!==`false`),a=Bc(n,a),n.includes(`prevent`)&&(a=s(a,(e,t)=>{t.preventDefault(),e(t)})),n.includes(`stop`)&&(a=s(a,(e,t)=>{t.stopPropagation(),e(t)})),n.includes(`once`)&&(a=s(a,(e,n)=>{e(n),i.removeEventListener(t,a,o)})),(n.includes(`away`)||n.includes(`outside`))&&(i=document,a=s(a,(t,n)=>{e.contains(n.target)||n.target.isConnected!==!1&&(e.offsetWidth<1&&e.offsetHeight<1||e._x_isShown!==!1&&t(n))})),n.includes(`self`)&&(a=s(a,(t,n)=>{n.target===e&&t(n)})),t===`submit`&&(a=s(a,(e,t)=>{t.target._x_pendingModelUpdates&&t.target._x_pendingModelUpdates.forEach(e=>e()),e(t)})),(Gc(t)||Kc(t))&&(a=s(a,(e,t)=>{qc(t,n)||e(t)})),i.addEventListener(t,a,o),()=>{i.removeEventListener(t,a,o)}}function Bc(e,t){if(e.includes(`debounce`)){let n=e[e.indexOf(`debounce`)+1]||`invalid-wait`,r=Uc(n.split(`ms`)[0])?Number(n.split(`ms`)[0]):250;t=Io(t,r)}if(e.includes(`throttle`)){let n=e[e.indexOf(`throttle`)+1]||`invalid-wait`,r=Uc(n.split(`ms`)[0])?Number(n.split(`ms`)[0]):250;t=Lo(t,r)}return t}function Vc(e){return e.replace(/-/g,`.`)}function Hc(e){return e.toLowerCase().replace(/-(\w)/g,(e,t)=>t.toUpperCase())}function Uc(e){return!Array.isArray(e)&&!isNaN(e)}function Wc(e){return[` `,`_`].includes(e)?e:e.replace(/([a-z])([A-Z])/g,`$1-$2`).replace(/[_\s]/,`-`).toLowerCase()}function Gc(e){return[`keydown`,`keyup`].includes(e)}function Kc(e){return[`contextmenu`,`click`,`mouse`].some(t=>e.includes(t))}function qc(e,t){let n=t.filter(e=>![`window`,`document`,`prevent`,`stop`,`once`,`capture`,`self`,`away`,`outside`,`passive`,`preserve-scroll`,`blur`,`change`,`lazy`].includes(e));if(n.includes(`debounce`)){let e=n.indexOf(`debounce`);n.splice(e,Uc((n[e+1]||`invalid-wait`).split(`ms`)[0])?2:1)}if(n.includes(`throttle`)){let e=n.indexOf(`throttle`);n.splice(e,Uc((n[e+1]||`invalid-wait`).split(`ms`)[0])?2:1)}if(n.length===0||n.length===1&&Jc(e.key).includes(n[0]))return!1;let r=[`ctrl`,`shift`,`alt`,`meta`,`cmd`,`super`].filter(e=>n.includes(e));return n=n.filter(e=>!r.includes(e)),!(r.length>0&&r.filter(t=>((t===`cmd`||t===`super`)&&(t=`meta`),e[`${t}Key`])).length===r.length&&(Kc(e.type)||Jc(e.key).includes(n[0])))}function Jc(e){if(!e)return[];e=Wc(e);let t={ctrl:`control`,slash:`/`,space:` `,spacebar:` `,cmd:`meta`,esc:`escape`,up:`arrow-up`,down:`arrow-down`,left:`arrow-left`,right:`arrow-right`,period:`.`,comma:`,`,equal:`=`,minus:`-`,underscore:`_`};return t[e]=e,Object.keys(t).map(n=>{if(t[n]===e)return n}).filter(e=>e)}H(`model`,(e,{modifiers:t,expression:n},{effect:r,cleanup:i})=>{let a=e;t.includes(`parent`)&&(a=G(e,t=>t!==e));let o=V(a,n),s;s=typeof n==`string`?V(a,`${n} = __placeholder`):typeof n==`function`&&typeof n()==`string`?V(a,`${n()} = __placeholder`):()=>{};let c=()=>{let e;return o(t=>e=t),$c(e)?e.get():e},l=e=>{let t;o(e=>t=e),$c(t)?t.set(e):s(()=>{},{scope:{__placeholder:e}})};typeof n==`string`&&e.type===`radio`&&z(()=>{e.hasAttribute(`name`)||e.setAttribute(`name`,n)});let u=t.includes(`change`)||t.includes(`lazy`),d=t.includes(`blur`),f=t.includes(`enter`),p=u||d||f,m;if(U)m=()=>{};else if(p){let n=[],r=n=>l(Yc(e,t,n,c()));if(u&&n.push(zc(e,`change`,t,r)),d&&(n.push(zc(e,`blur`,t,r)),e.form)){let t=e.form,n=()=>r({target:e});t._x_pendingModelUpdates||=[],t._x_pendingModelUpdates.push(n),i(()=>{t._x_pendingModelUpdates&&t._x_pendingModelUpdates.splice(t._x_pendingModelUpdates.indexOf(n),1)})}f&&n.push(zc(e,`keydown`,t,e=>{e.key===`Enter`&&r(e)})),m=()=>n.forEach(e=>e())}else m=zc(e,e.tagName.toLowerCase()===`select`||[`checkbox`,`radio`].includes(e.type)?`change`:`input`,t,n=>{l(Yc(e,t,n,c()))});if(t.includes(`fill`)&&([void 0,null,``].includes(c())||Po(e)&&Array.isArray(c())||e.tagName.toLowerCase()===`select`&&e.multiple)&&l(Yc(e,t,{target:e},c())),e._x_removeModelListeners||={},e._x_removeModelListeners.default=m,i(()=>e._x_removeModelListeners.default()),e.form){let n=zc(e.form,`reset`,[],n=>{Ya(()=>e._x_model&&e._x_model.set(Yc(e,t,{target:e},c())))});i(()=>n())}if(e._x_model={get(){return c()},set(e){l(e)},setWithModifiers:Bc(t,l)},e._x_forceModelUpdate=t=>{t===void 0&&typeof n==`string`&&n.match(/\./)&&(t=``),z(()=>{Po(e)?e.checked=Array.isArray(t)?t.some(t=>t==e.value):!!t:Fo(e)?e.checked=typeof t==`boolean`?Eo(e.value)===t:e.value==t:ho(e,`value`,t)})},e.tagName===`SELECT`){let t=new MutationObserver(()=>{e._x_forceModelUpdate(c())});t.observe(e,{childList:!0}),i(()=>t.disconnect())}r(()=>{let n=c();t.includes(`unintrusive`)&&document.activeElement.isSameNode(e)||e._x_forceModelUpdate(n)})});function Yc(e,t,n,r){return z(()=>{if(n instanceof CustomEvent&&n.detail!==void 0)return n.detail!==null&&n.detail!==void 0?n.detail:n.target.value;if(Po(e)){if(Array.isArray(r)){let e=null;return e=t.includes(`number`)?Xc(n.target.value):t.includes(`boolean`)?Eo(n.target.value):n.target.value,n.target.checked?r.includes(e)?r:r.concat([e]):r.filter(t=>!Zc(t,e))}return n.target.checked}if(e.tagName.toLowerCase()===`select`&&e.multiple)return t.includes(`number`)?Array.from(n.target.selectedOptions).map(e=>Xc(e.value||e.text)):t.includes(`boolean`)?Array.from(n.target.selectedOptions).map(e=>Eo(e.value||e.text)):Array.from(n.target.selectedOptions).map(e=>e.value||e.text);{let i;return i=Fo(e)?n.target.checked?n.target.value:r:n.target.value,t.includes(`number`)?Xc(i):t.includes(`boolean`)?Eo(i):t.includes(`trim`)?i.trim():i}})}function Xc(e){let t=e?parseFloat(e):null;return Qc(t)?t:e}function Zc(e,t){return e==t}function Qc(e){return!Array.isArray(e)&&!isNaN(e)}function $c(e){return typeof e==`object`&&!!e&&typeof e.get==`function`&&typeof e.set==`function`}H(`cloak`,e=>queueMicrotask(()=>z(()=>e.removeAttribute(Ki(`cloak`))))),za(()=>`[${Ki(`init`)}]`),H(`init`,ga((e,{expression:t},{evaluate:n})=>typeof t==`string`?!!t.trim()&&n(t,{},!1):n(t,{},!1))),H(`text`,(e,{expression:t},{effect:n,evaluateLater:r})=>{let i=r(t);n(()=>{i(t=>{z(()=>{e.textContent=t})})})}),H(`html`,(e,{expression:t},{effect:n,evaluateLater:r})=>{let i=r(t);n(()=>{i(t=>{z(()=>{Array.from(e.children).forEach(e=>Ga(e)),e.innerHTML=t??``,e._x_ignoreSelf=!0,K(e),delete e._x_ignoreSelf})})},{priority:`structural`})}),ca(ia(`:`,aa(Ki(`bind:`))));var el=(e,{value:t,modifiers:n,expression:r,original:i},{effect:a,cleanup:o})=>{if(!t){let t={};Ko(t),V(e,r)(t=>{qo(e,t,i)},{scope:t});return}if(t===`key`)return tl(e,r);if(e._x_inlineBindings&&e._x_inlineBindings[t]&&e._x_inlineBindings[t].extract)return;let s=V(e,r);a(()=>s(i=>{i===void 0&&typeof r==`string`&&r.match(/\./)&&(i=``),z(()=>ho(e,t,i,n))})),o(()=>{e._x_undoAddedClasses&&e._x_undoAddedClasses(),e._x_undoAddedStyles&&e._x_undoAddedStyles()})};el.inline=(e,{value:t,modifiers:n,expression:r})=>{t&&(e._x_inlineBindings||={},e._x_inlineBindings[t]={expression:r,extract:!1})},H(`bind`,el);function tl(e,t){e._x_keyExpression=t}Ra(()=>`[${Ki(`data`)}]`);var nl=Symbol();H(`data`,(e,{expression:t},{cleanup:n})=>{if(il(e))return;let r=e[nl];if(r?.expression===t)return;t=t===``?`{}`:t;let i={};Ci(i,e);let a={};Xo(a,i);let o=Mi(e,t,{scope:a});(o===void 0||o===!0)&&(o={}),Ci(o,e);let s;if(r?.reactiveData){s=r.reactiveData,rl(s,o);let n={expression:t};e[nl]=n,queueMicrotask(()=>{e[nl]===n&&delete e[nl]})}else s=Mr(o);vi(s,n);let c=fi(e,s);s.init&&Mi(e,s.init),n(()=>{s.destroy&&Mi(e,s.destroy),c();let t={reactiveData:s};e[nl]=t,queueMicrotask(()=>{e[nl]===t&&delete e[nl]})})});function rl(e,t){Object.keys(t).forEach(n=>{let r=Object.getOwnPropertyDescriptor(t,n),i=Object.getOwnPropertyDescriptor(e,n);r.get||r.set||i?.get||i?.set?(i&&delete e[n],i||(e[n]=void 0),r.get||r.set?Object.defineProperty(e,n,r):e[n]=t[n]):e[n]=t[n]}),Object.keys(e).filter(e=>!Object.prototype.hasOwnProperty.call(t,e)).forEach(t=>delete e[t])}ya((e,t)=>{e._x_dataStack&&(t._x_dataStack=e._x_dataStack,t.setAttribute(`data-has-alpine-state`,!0))});function il(e){return U?xa?!0:e.hasAttribute(`data-has-alpine-state`):!1}H(`show`,(e,{modifiers:t,expression:n},{effect:r})=>{let i=V(e,n);e._x_doHide||=()=>{z(()=>{e.style.setProperty(`display`,`none`,t.includes(`important`)?`important`:void 0)})},e._x_doShow||=()=>{z(()=>{e.style.length===1&&e.style.display===`none`?e.removeAttribute(`style`):e.style.removeProperty(`display`)})};let a=()=>{e._x_doHide(),e._x_isShown=!1},o=()=>{e._x_doShow(),e._x_isShown=!0},s=()=>setTimeout(o),c=oo(e=>e?o():a(),t=>{typeof e._x_toggleAndCascadeWithTransitions==`function`?e._x_toggleAndCascadeWithTransitions(e,t,o,a):t?s():a()}),l,u=!0;r(()=>i(e=>{(u||e!==l)&&(t.includes(`immediate`)&&(e?s():a()),c(e),l=e,u=!1)}))}),H(`for`,ga((e,{expression:t},{effect:n,cleanup:r})=>{let i=sl(t),a=V(e,i.items),o=V(e,e._x_keyExpression||`index`);e._x_lookup=new Map,n(()=>ol(e,i,a,o),{priority:`structural`}),r(()=>{e._x_lookup.forEach(e=>z(()=>{Ga(e),e.remove()})),delete e._x_lookup,delete e._x_lastRenderedEl})}));function al(e){return t=>{Object.entries(t).forEach(([t,n])=>{e[t]=n})}}function ol(e,t,n,r){n(n=>{ll(n)&&(n=Array.from({length:n},(e,t)=>t+1)),n??=[],n instanceof Set&&(n=Array.from(n)),n instanceof Map&&(n=Array.from(n));let i=e._x_lookup,a=new Map;e._x_lookup=a;let o=ul(n),s=Object.entries(n).map(([s,c])=>{o||(s=parseInt(s));let l=cl(t,c,s,n),u;return r(t=>{typeof t==`object`&&W(`x-for key cannot be an object, it must be a string or an integer`,e),i.has(t)&&(a.set(t,i.get(t)),i.delete(t)),u=t},{scope:{index:s,...l}}),[u,l]});z(()=>{i.forEach(e=>{Ga(e),e.remove()});let t=new Set,n=e;s.forEach(([r,i])=>{if(a.has(r)){let e=a.get(r);e._x_refreshXForScope(i),n.nextElementSibling!==e&&(n.nextElementSibling&&e.replaceWith(n.nextElementSibling),n.after(e)),n=e,e._x_currentIfEl&&(e.nextElementSibling!==e._x_currentIfEl&&n.after(e._x_currentIfEl),n=e._x_currentIfEl);return}e.content.children.length>1&&W(`x-for templates require a single root element, additional elements will be ignored.`,e);let o=document.importNode(e.content,!0).firstElementChild,s=Mr(i);fi(o,s,e),o._x_refreshXForScope=al(s),a.set(r,o),t.add(o),n.after(o),n=o}),t.forEach(e=>K(e)),n===e?delete e._x_lastRenderedEl:e._x_lastRenderedEl=n})})}function sl(e){let t=/,([^,\}\]]*)(?:,([^,\}\]]*))?$/,n=/^\s*\(|\)\s*$/g,r=e.match(/([\s\S]*?)\s+(?:in|of)\s+([\s\S]*)/);if(!r)return;let i={};i.items=r[2].trim();let a=r[1].replace(n,``).trim(),o=a.match(t);return o?(i.item=a.replace(t,``).trim(),i.index=o[1].trim(),o[2]&&(i.collection=o[2].trim())):i.item=a,i}function cl(e,t,n,r){let i={};return/^\[.*\]$/.test(e.item)&&Array.isArray(t)?e.item.replace(`[`,``).replace(`]`,``).split(`,`).map(e=>e.trim()).forEach((e,n)=>{i[e]=t[n]}):/^\{.*\}$/.test(e.item)&&!Array.isArray(t)&&typeof t==`object`?e.item.replace(`{`,``).replace(`}`,``).split(`,`).map(e=>e.trim()).forEach(e=>{i[e]=t[e]}):i[e.item]=t,e.index&&(i[e.index]=n),e.collection&&(i[e.collection]=r),i}function ll(e){return typeof e!=`object`&&!isNaN(e)}function ul(e){return typeof e==`object`&&!Array.isArray(e)}function dl(){}dl.inline=(e,{expression:t},{cleanup:n})=>{let r=Ba(e);r&&(r._x_refs||={},r._x_refs[t]=e,n(()=>delete r._x_refs[t]))},H(`ref`,dl),H(`if`,ga((e,{expression:t},{effect:n,cleanup:r})=>{e.tagName.toLowerCase()!==`template`&&W(`x-if can only be used on a <template> tag`,e);let i=V(e,t),a=()=>{if(e._x_currentIfEl)return e._x_currentIfEl;let t=e.content.cloneNode(!0).firstElementChild;return fi(t,{},e),z(()=>{e.after(t),K(t)}),e._x_currentIfEl=t,e._x_lastRenderedEl=t,e._x_undoIf=()=>{z(()=>{Ga(t),t.remove()}),delete e._x_currentIfEl,delete e._x_lastRenderedEl},t},o=()=>{e._x_undoIf&&(e._x_undoIf(),delete e._x_undoIf)};n(()=>i(e=>{e?a():o()}),{priority:`structural`}),r(()=>e._x_undoIf&&e._x_undoIf())})),H(`id`,(e,{expression:t},{evaluate:n})=>{n(t).forEach(t=>Nc(e,t))}),ya((e,t)=>{e._x_ids&&(t._x_ids=e._x_ids)}),ca(ia(`@`,aa(Ki(`on:`)))),H(`on`,ga((e,{value:t,modifiers:n,expression:r},{cleanup:i})=>{let a=r?V(e,r):()=>{};e.tagName.toLowerCase()===`template`&&(e._x_forwardEvents||=[],e._x_forwardEvents.includes(t)||e._x_forwardEvents.push(t));let o=zc(e,t,n,e=>{a(()=>{},{scope:{$event:e},params:[e]})});i(()=>o())})),fl(`Collapse`,`collapse`,`collapse`),fl(`Intersect`,`intersect`,`intersect`),fl(`Focus`,`trap`,`focus`),fl(`Mask`,`mask`,`mask`);function fl(e,t,n){H(t,r=>W(`You can't use [x-${t}] without first installing the "${e}" plugin here: https://alpinejs.dev/plugins/${n}`,r))}Zo.setEvaluator(Li),Zo.setRawEvaluator(Wi),Zo.setReactivityEngine({reactive:yc,effect:(e,t={})=>{let n;return n=Os(e,{scheduler:()=>{n&&(t.scheduler?t.scheduler(n):n())}}),n},release:ks,raw:$});var pl=Zo;window.Alpine=pl,pl.start();
+
+
+========================================
+ARQUIVO: C:\Projetos\reports\foto-os\public\js\db-offline.js
+========================================
+
+const DB_NAME = 'FotoOS_Offline_DB';
+const DB_VERSION = 1;
+
+function openOfflineDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+
+            // Store de Relatórios Pendentes
+            if (!db.objectStoreNames.contains('pending_reports')) {
+                db.createObjectStore('pending_reports', { keyPath: 'client_id' });
+            }
+
+            // Store de Fotos Pendentes (armazena o Blob binário)
+            if (!db.objectStoreNames.contains('pending_photos')) {
+                const photoStore = db.createObjectStore('pending_photos', { keyPath: 'client_photo_id' });
+                photoStore.createIndex('report_client_id', 'report_client_id', { unique: false });
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+const OfflineStore = {
+    async saveReport(reportData) {
+        const db = await openOfflineDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('pending_reports', 'readwrite');
+            const store = tx.objectStore('pending_reports');
+            store.put(reportData);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    async savePhoto(photoData) {
+        const db = await openOfflineDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('pending_photos', 'readwrite');
+            const store = tx.objectStore('pending_photos');
+            store.put(photoData);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    async getPendingReports() {
+        const db = await openOfflineDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('pending_reports', 'readonly');
+            const store = tx.objectStore('pending_reports');
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async getPhotosByReportClientId(reportClientId) {
+        const db = await openOfflineDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('pending_photos', 'readonly');
+            const store = tx.objectStore('pending_photos');
+            const index = store.index('report_client_id');
+            const req = index.getAll(reportClientId);
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async deletePhoto(clientPhotoId) {
+        const db = await openOfflineDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('pending_photos', 'readwrite');
+            tx.objectStore('pending_photos').delete(clientPhotoId);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    },
+
+    async deleteReport(clientId) {
+        const db = await openOfflineDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('pending_reports', 'readwrite');
+            tx.objectStore('pending_reports').delete(clientId);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+};
+
+window.OfflineStore = OfflineStore;
+
 
 
 ========================================
@@ -8467,7 +8607,7 @@ window.OfflineStore = {
 ARQUIVO: C:\Projetos\reports\foto-os\public\js\report-flow.js
 ========================================
 
-async function compressImage(file, maxDimension = 1920, quality = 0.9) {
+async function compressImage(file, maxDimension = 1920, quality = 0.85) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -8497,7 +8637,7 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
                 ctx.drawImage(img, 0, 0, width, height);
 
                 canvas.toBlob((blob) => {
-                    resolve(new File([blob], file.name, {
+                    resolve(new File([blob], file.name || 'foto.jpg', {
                         type: 'image/jpeg',
                         lastModified: Date.now()
                     }));
@@ -8521,7 +8661,7 @@ const OfflineStore = {
                         db.createObjectStore('pending_reports', { keyPath: 'client_temp_id' });
                     }
                     if (!db.objectStoreNames.contains('pending_photos')) {
-                        db.createObjectStore('pending_photos', { autoIncrement: true });
+                        db.createObjectStore('pending_photos', { keyPath: 'client_photo_id' });
                     }
                 };
                 req.onsuccess = () => resolve(req.result);
@@ -8530,6 +8670,7 @@ const OfflineStore = {
         }
         return this.dbPromise;
     },
+
     async savePendingReport(data) {
         const db = await this.init();
         return new Promise((res, rej) => {
@@ -8539,15 +8680,17 @@ const OfflineStore = {
             tx.onerror = () => rej(tx.error);
         });
     },
+
     async savePendingPhoto(data) {
         const db = await this.init();
         return new Promise((res, rej) => {
             const tx = db.transaction('pending_photos', 'readwrite');
-            tx.objectStore('pending_photos').add(data);
+            tx.objectStore('pending_photos').put(data);
             tx.oncomplete = () => res();
             tx.onerror = () => rej(tx.error);
         });
     },
+
     async getPendingReports() {
         const db = await this.init();
         return new Promise((res) => {
@@ -8556,6 +8699,7 @@ const OfflineStore = {
             req.onsuccess = () => res(req.result || []);
         });
     },
+
     async getPendingPhotos() {
         const db = await this.init();
         return new Promise((res) => {
@@ -8564,10 +8708,25 @@ const OfflineStore = {
             req.onsuccess = () => res(req.result || []);
         });
     },
-    async clearSynced(storeName) {
+
+    async deletePhoto(clientPhotoId) {
         const db = await this.init();
-        const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).clear();
+        return new Promise((res, rej) => {
+            const tx = db.transaction('pending_photos', 'readwrite');
+            tx.objectStore('pending_photos').delete(clientPhotoId);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
+    },
+
+    async deleteReport(clientTempId) {
+        const db = await this.init();
+        return new Promise((res, rej) => {
+            const tx = db.transaction('pending_reports', 'readwrite');
+            tx.objectStore('pending_reports').delete(clientTempId);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
     }
 };
 
@@ -8582,6 +8741,13 @@ function registerReportFlow() {
         reportId: null,
         pdfUrl: null,
         isFinalized: false,
+
+        // Status de Rede e Sincronização
+        isOnline: navigator.onLine,
+        isSyncing: false,
+        syncProgress: 0,
+        syncTotal: 0,
+        syncStatusText: '',
 
         // Taxonomias Dinâmicas & Autocomplete
         availableUnits: [],
@@ -8599,23 +8765,45 @@ function registerReportFlow() {
         history: '',
         photos: [],
 
-        // Debounce da Busca por OS
         debounceSearchTimer: null,
 
         async init() {
+            // Se estiver sem internet, ignora a requisição AJAX para não gerar erro
+            if (!navigator.onLine) {
+                console.info('Modo Offline: Usando cache ou limitando taxonomias.');
+                return;
+            }
+
+            try {
+                const res = await axios.get('/api/taxonomies/units');
+                this.availableUnits = res.data || [];
+            } catch (e) {
+                console.warn('Falha na rede: Taxonomias indisponíveis.', e);
+            }
             await this.loadTaxonomies();
 
             this.$watch('unit', () => this.filterUnits());
             this.$watch('sectorInput', () => this.filterSectors());
 
             window.addEventListener('online', () => {
+                this.isOnline = true;
                 this.syncPendingData();
             });
+
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+                this.errorMessage = 'Sem conexão à internet. Operando em modo offline.';
+            });
+
+            // Se carregar já conectado, verifica se existem relatórios pendentes
+            if (this.isOnline) {
+                this.syncPendingData();
+            }
         },
 
         async loadTaxonomies() {
             try {
-                const res = await axios.get('/api/v1/taxonomies/units');
+                const res = await axios.get('/api/taxonomies/units');
                 this.availableUnits = res.data || [];
             } catch (e) {
                 console.warn('Modo offline: Taxonomias indisponíveis na rede.', e);
@@ -8677,10 +8865,15 @@ function registerReportFlow() {
 
         async searchOs() {
             const os = this.osNumber.trim();
-            if (!os || os.length < 2) return;
+
+            // TRAVA CRÍTICA: Se não houver OS, ou não houver internet,
+            // a busca no servidor NÃO pode ser disparada.
+            if (!os || os.length < 2 || !navigator.onLine) {
+                return;
+            }
 
             try {
-                const response = await axios.get('/api/v1/reports/search', { params: { os_number: os } });
+                const response = await axios.get('/api/reports/search', { params: { os_number: os } });
                 if (response.data.found) {
                     const r = response.data.data;
                     this.reportId = r.id;
@@ -8706,18 +8899,21 @@ function registerReportFlow() {
                     this.errorMessage = '';
                 }
             } catch (err) {
-                console.warn('Erro ao pesquisar OS:', err);
+                // Se a rede cair EXATAMENTE DURANTE o request, silencia o erro visual na tela
+                console.warn('Erro isolado de rede ao pesquisar OS:', err);
+                this.errorMessage = '';
+                this.successMessage = '';
             }
         },
 
         async reopenReport() {
-            if (!this.reportId) return;
+            if (!this.reportId || !navigator.onLine) return;
             this.loading = true;
             this.errorMessage = '';
             try {
-                await axios.post(`/api/v1/reports/${this.reportId}/reopen`);
+                await axios.post(`/api/reports/${this.reportId}/reopen`);
                 this.isFinalized = false;
-                this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e avançar para fotos.';
+                this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e capturar mais fotos.';
             } catch (err) {
                 this.errorMessage = err.response?.data?.error || 'Erro ao reabrir OS.';
             } finally {
@@ -8759,7 +8955,7 @@ function registerReportFlow() {
 
             try {
                 if (navigator.onLine) {
-                    const response = await axios.post('/api/v1/reports', payload);
+                    const response = await axios.post('/api/reports', payload);
                     this.reportId = response.data.data.id;
                     this.step = 2;
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -8775,7 +8971,16 @@ function registerReportFlow() {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             } catch (err) {
-                this.errorMessage = err.response?.data?.message || 'Falha ao iniciar relatório.';
+                // Se falhar na rede, faz fallback para armazenamento offline
+                const tempId = this.reportId || ('temp_' + Date.now());
+                this.reportId = tempId;
+                await OfflineStore.savePendingReport({
+                    client_temp_id: tempId,
+                    ...payload,
+                    created_at: new Date().toISOString()
+                });
+                this.step = 2;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             } finally {
                 this.loading = false;
             }
@@ -8794,7 +8999,7 @@ function registerReportFlow() {
 
             let fileToSend = rawFile;
             try {
-                fileToSend = await compressImage(rawFile, 1920, 0.9);
+                fileToSend = await compressImage(rawFile, 1920, 0.85);
             } catch (error) {
                 console.warn('Falha na compressão client-side:', error);
             }
@@ -8810,7 +9015,6 @@ function registerReportFlow() {
                 console.warn('GPS indisponível:', posError);
                 lat = -22.7641;
                 lng = -43.3994;
-                alert('Aviso: GPS real inacessível. Coordenadas de contingência ativadas.');
             }
 
             const formData = new FormData();
@@ -8819,9 +9023,11 @@ function registerReportFlow() {
             formData.append('longitude', lng);
             formData.append('observation', '');
 
+            const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
+
             try {
-                if (navigator.onLine && !this.reportId.startsWith('temp_')) {
-                    const response = await axios.post(`/api/v1/reports/${this.reportId}/photos`, formData, {
+                if (navigator.onLine && !isTemporary) {
+                    const response = await axios.post(`/api/reports/${this.reportId}/photos`, formData, {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
 
@@ -8831,7 +9037,9 @@ function registerReportFlow() {
                         observation: ''
                     });
                 } else {
+                    const clientPhotoId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
                     await OfflineStore.savePendingPhoto({
+                        client_photo_id: clientPhotoId,
                         report_client_id: this.reportId,
                         blob: fileToSend,
                         latitude: lat,
@@ -8840,13 +9048,28 @@ function registerReportFlow() {
                     });
 
                     this.photos.push({
-                        id: 'local_' + Date.now(),
+                        id: clientPhotoId,
                         url: URL.createObjectURL(fileToSend),
                         observation: ''
                     });
                 }
             } catch (err) {
-                this.errorMessage = err.response?.data?.message || 'Erro ao processar envio da foto.';
+                // Fallback de contingência local em erro de transmissão
+                const clientPhotoId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+                await OfflineStore.savePendingPhoto({
+                    client_photo_id: clientPhotoId,
+                    report_client_id: this.reportId,
+                    blob: fileToSend,
+                    latitude: lat,
+                    longitude: lng,
+                    created_at: new Date().toISOString()
+                });
+
+                this.photos.push({
+                    id: clientPhotoId,
+                    url: URL.createObjectURL(fileToSend),
+                    observation: ''
+                });
             } finally {
                 this.loading = false;
                 event.target.value = '';
@@ -8860,16 +9083,16 @@ function registerReportFlow() {
                 }
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
-                    timeout: 10000,
+                    timeout: 8000,
                     maximumAge: 0
                 });
             });
         },
 
         async updatePhotoObservation(photoId, observation) {
-            if (photoId.startsWith('local_')) return;
+            if (String(photoId).startsWith('local_')) return;
             try {
-                await axios.patch(`/api/v1/photos/${photoId}`, { observation });
+                await axios.patch(`/api/photos/${photoId}`, { observation });
             } catch (err) {
                 console.warn('Falha ao atualizar observação:', err);
             }
@@ -8882,44 +9105,77 @@ function registerReportFlow() {
             const item = this.photos.splice(index, 1)[0];
             this.photos.splice(targetIndex, 0, item);
 
-            if (navigator.onLine && !this.reportId.startsWith('temp_')) {
+            const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
+            if (navigator.onLine && !isTemporary) {
                 const order = this.photos.map(p => p.id);
-                axios.patch(`/api/v1/reports/${this.reportId}/photos/reorder`, { order });
+                axios.patch(`/api/reports/${this.reportId}/photos/reorder`, { order });
             }
         },
 
         async syncPendingData() {
-            if (!navigator.onLine) return;
-            const pendingReports = await OfflineStore.getPendingReports();
+            if (this.isSyncing || !navigator.onLine) return;
 
-            for (const rep of pendingReports) {
+            const pendingReports = await OfflineStore.getPendingReports();
+            if (pendingReports.length === 0) return;
+
+            this.isSyncing = true;
+            this.syncTotal = pendingReports.length;
+            this.syncProgress = 0;
+
+            for (let i = 0; i < pendingReports.length; i++) {
+                const rep = pendingReports[i];
+                this.syncStatusText = `Sincronizando OS ${rep.os_number} (${i + 1}/${this.syncTotal})...`;
+
                 try {
-                    const res = await axios.post('/api/v1/reports', {
+                    const res = await axios.post('/api/reports', {
                         os_number: rep.os_number,
                         unit: rep.unit,
                         sectors: rep.sectors,
                         technicians: rep.technicians,
                         history: rep.history
                     });
-                    const realId = res.data.data.id;
+
+                    const realReportId = res.data.data.id;
+                    if (this.reportId === rep.client_temp_id) {
+                        this.reportId = realReportId;
+                    }
 
                     const pendingPhotos = await OfflineStore.getPendingPhotos();
-                    for (const photo of pendingPhotos) {
-                        if (photo.report_client_id === rep.client_temp_id) {
-                            const formData = new FormData();
-                            formData.append('photo', photo.blob);
-                            formData.append('latitude', photo.latitude);
-                            formData.append('longitude', photo.longitude);
-                            formData.append('observation', photo.observation || '');
-                            await axios.post(`/api/v1/reports/${realId}/photos`, formData);
-                        }
+                    const photosToSync = pendingPhotos.filter(p => p.report_client_id === rep.client_temp_id);
+
+                    for (let j = 0; j < photosToSync.length; j++) {
+                        const photo = photosToSync[j];
+                        this.syncStatusText = `Enviando foto ${j + 1}/${photosToSync.length} da OS ${rep.os_number}...`;
+
+                        const formData = new FormData();
+                        formData.append('photo', photo.blob, 'foto.jpg');
+                        formData.append('latitude', photo.latitude);
+                        formData.append('longitude', photo.longitude);
+                        formData.append('observation', photo.observation || '');
+
+                        await axios.post(`/api/reports/${realReportId}/photos`, formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                        });
+
+                        await OfflineStore.deletePhoto(photo.client_photo_id);
                     }
+
+                    if (rep.is_finalized) {
+                        await axios.post(`/api/reports/${realReportId}/finalize`);
+                    }
+
+                    await OfflineStore.deleteReport(rep.client_temp_id);
                 } catch (err) {
-                    console.error('Falha na sincronização em lote:', err);
+                    console.error('Falha na sincronização do relatório:', err);
                 }
+
+                this.syncProgress = Math.round(((i + 1) / this.syncTotal) * 100);
             }
-            await OfflineStore.clearSynced('pending_reports');
-            await OfflineStore.clearSynced('pending_photos');
+
+            this.isSyncing = false;
+            this.syncStatusText = '';
+            this.successMessage = 'Dados sincronizados com sucesso com o servidor!';
+            setTimeout(() => { this.successMessage = ''; }, 4000);
         },
 
         async finalize() {
@@ -8929,13 +9185,24 @@ function registerReportFlow() {
             }
 
             this.loading = true;
+            const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
+
             try {
-                if (navigator.onLine && !this.reportId.startsWith('temp_')) {
-                    const res = await axios.post(`/api/v1/reports/${this.reportId}/finalize`);
+                if (navigator.onLine && !isTemporary) {
+                    const res = await axios.post(`/api/reports/${this.reportId}/finalize`);
                     this.pdfUrl = res.data.data.pdf_url;
                     this.step = 3;
                 } else {
-                    alert('Relatório gravado offline. Conecte-se à internet para sincronizar e gerar o PDF.');
+                    if (this.reportId) {
+                        const pendingReports = await OfflineStore.getPendingReports();
+                        const currentRep = pendingReports.find(r => r.client_temp_id === this.reportId);
+                        if (currentRep) {
+                            currentRep.is_finalized = true;
+                            await OfflineStore.savePendingReport(currentRep);
+                        }
+                    }
+                    alert('Relatório gravado offline com sucesso! Ele será enviado e o PDF gerado assim que o dispositivo recuperar o sinal de internet.');
+                    this.resetFlow();
                 }
             } catch (err) {
                 this.errorMessage = err.response?.data?.message || 'Erro ao finalizar relatório.';
@@ -9031,227 +9298,371 @@ ARQUIVO: C:\Projetos\reports\foto-os\resources\views\welcome.blade.php
 ========================================
 
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#111827">
+    <title>FotoOS - Relatórios em Campo</title>
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="manifest" href="/manifest.json">
 
-        @fonts
+    <style>
+        [x-cloak] { display: none !important; }
+        .btn-camera {
+            border: 2px dashed #059669;
+            background-color: #ecfdf5;
+            color: #065f46;
+        }
+        .btn-camera:hover {
+            background-color: #d1fae5;
+        }
+        .btn-finalize-active {
+            background-color: #111827 !important;
+            color: #ffffff !important;
+            cursor: pointer;
+        }
+        .btn-finalize-disabled {
+            background-color: #e5e7eb !important;
+            color: #9ca3af !important;
+            border: 1px solid #d1d5db !important;
+            cursor: not-allowed;
+        }
+    </style>
 
-        <!-- Styles / Scripts -->
-        @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-            @vite(['resources/css/app.css', 'resources/js/app.js'])
-        @else
-            <style>
-                /*! tailwindcss v4.0.7 | MIT License | https://tailwindcss.com */ @layer properties{@supports (((-webkit-hyphens:none)) and (not (margin-trim:inline))) or ((-moz-orient:inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--tw-translate-x:0;--tw-translate-y:0;--tw-translate-z:0;--tw-rotate-x:initial;--tw-rotate-y:initial;--tw-rotate-z:initial;--tw-skew-x:initial;--tw-skew-y:initial;--tw-space-x-reverse:0;--tw-border-style:solid;--tw-leading:initial;--tw-font-weight:initial;--tw-tracking:initial;--tw-shadow:0 0 #0000;--tw-shadow-color:initial;--tw-shadow-alpha:100%;--tw-inset-shadow:0 0 #0000;--tw-inset-shadow-color:initial;--tw-inset-shadow-alpha:100%;--tw-ring-color:initial;--tw-ring-shadow:0 0 #0000;--tw-inset-ring-color:initial;--tw-inset-ring-shadow:0 0 #0000;--tw-ring-inset:initial;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-offset-shadow:0 0 #0000;--tw-blur:initial;--tw-brightness:initial;--tw-contrast:initial;--tw-grayscale:initial;--tw-hue-rotate:initial;--tw-invert:initial;--tw-opacity:initial;--tw-saturate:initial;--tw-sepia:initial;--tw-drop-shadow:initial;--tw-drop-shadow-color:initial;--tw-drop-shadow-alpha:100%;--tw-drop-shadow-size:initial;--tw-duration:initial;--tw-ease:initial;--tw-content:""}}}@layer theme{:root,:host{--font-sans:"Instrument Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";--font-serif:ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;--font-mono:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;--color-red-50:oklch(97.1% .013 17.38);--color-red-100:oklch(93.6% .032 17.717);--color-red-200:oklch(88.5% .062 18.334);--color-red-300:oklch(80.8% .114 19.571);--color-red-400:oklch(70.4% .191 22.216);--color-red-500:oklch(63.7% .237 25.331);--color-red-600:oklch(57.7% .245 27.325);--color-red-700:oklch(50.5% .213 27.518);--color-red-800:oklch(44.4% .177 26.899);--color-red-900:oklch(39.6% .141 25.723);--color-red-950:oklch(25.8% .092 26.042);--color-orange-50:oklch(98% .016 73.684);--color-orange-100:oklch(95.4% .038 75.164);--color-orange-200:oklch(90.1% .076 70.697);--color-orange-300:oklch(83.7% .128 66.29);--color-orange-400:oklch(75% .183 55.934);--color-orange-500:oklch(70.5% .213 47.604);--color-orange-600:oklch(64.6% .222 41.116);--color-orange-700:oklch(55.3% .195 38.402);--color-orange-800:oklch(47% .157 37.304);--color-orange-900:oklch(40.8% .123 38.172);--color-orange-950:oklch(26.6% .079 36.259);--color-amber-50:oklch(98.7% .022 95.277);--color-amber-100:oklch(96.2% .059 95.617);--color-amber-200:oklch(92.4% .12 95.746);--color-amber-300:oklch(87.9% .169 91.605);--color-amber-400:oklch(82.8% .189 84.429);--color-amber-500:oklch(76.9% .188 70.08);--color-amber-600:oklch(66.6% .179 58.318);--color-amber-700:oklch(55.5% .163 48.998);--color-amber-800:oklch(47.3% .137 46.201);--color-amber-900:oklch(41.4% .112 45.904);--color-amber-950:oklch(27.9% .077 45.635);--color-yellow-50:oklch(98.7% .026 102.212);--color-yellow-100:oklch(97.3% .071 103.193);--color-yellow-200:oklch(94.5% .129 101.54);--color-yellow-300:oklch(90.5% .182 98.111);--color-yellow-400:oklch(85.2% .199 91.936);--color-yellow-500:oklch(79.5% .184 86.047);--color-yellow-600:oklch(68.1% .162 75.834);--color-yellow-700:oklch(55.4% .135 66.442);--color-yellow-800:oklch(47.6% .114 61.907);--color-yellow-900:oklch(42.1% .095 57.708);--color-yellow-950:oklch(28.6% .066 53.813);--color-lime-50:oklch(98.6% .031 120.757);--color-lime-100:oklch(96.7% .067 122.328);--color-lime-200:oklch(93.8% .127 124.321);--color-lime-300:oklch(89.7% .196 126.665);--color-lime-400:oklch(84.1% .238 128.85);--color-lime-500:oklch(76.8% .233 130.85);--color-lime-600:oklch(64.8% .2 131.684);--color-lime-700:oklch(53.2% .157 131.589);--color-lime-800:oklch(45.3% .124 130.933);--color-lime-900:oklch(40.5% .101 131.063);--color-lime-950:oklch(27.4% .072 132.109);--color-green-50:oklch(98.2% .018 155.826);--color-green-100:oklch(96.2% .044 156.743);--color-green-200:oklch(92.5% .084 155.995);--color-green-300:oklch(87.1% .15 154.449);--color-green-400:oklch(79.2% .209 151.711);--color-green-500:oklch(72.3% .219 149.579);--color-green-600:oklch(62.7% .194 149.214);--color-green-700:oklch(52.7% .154 150.069);--color-green-800:oklch(44.8% .119 151.328);--color-green-900:oklch(39.3% .095 152.535);--color-green-950:oklch(26.6% .065 152.934);--color-emerald-50:oklch(97.9% .021 166.113);--color-emerald-100:oklch(95% .052 163.051);--color-emerald-200:oklch(90.5% .093 164.15);--color-emerald-300:oklch(84.5% .143 164.978);--color-emerald-400:oklch(76.5% .177 163.223);--color-emerald-500:oklch(69.6% .17 162.48);--color-emerald-600:oklch(59.6% .145 163.225);--color-emerald-700:oklch(50.8% .118 165.612);--color-emerald-800:oklch(43.2% .095 166.913);--color-emerald-900:oklch(37.8% .077 168.94);--color-emerald-950:oklch(26.2% .051 172.552);--color-teal-50:oklch(98.4% .014 180.72);--color-teal-100:oklch(95.3% .051 180.801);--color-teal-200:oklch(91% .096 180.426);--color-teal-300:oklch(85.5% .138 181.071);--color-teal-400:oklch(77.7% .152 181.912);--color-teal-500:oklch(70.4% .14 182.503);--color-teal-600:oklch(60% .118 184.704);--color-teal-700:oklch(51.1% .096 186.391);--color-teal-800:oklch(43.7% .078 188.216);--color-teal-900:oklch(38.6% .063 188.416);--color-teal-950:oklch(27.7% .046 192.524);--color-cyan-50:oklch(98.4% .019 200.873);--color-cyan-100:oklch(95.6% .045 203.388);--color-cyan-200:oklch(91.7% .08 205.041);--color-cyan-300:oklch(86.5% .127 207.078);--color-cyan-400:oklch(78.9% .154 211.53);--color-cyan-500:oklch(71.5% .143 215.221);--color-cyan-600:oklch(60.9% .126 221.723);--color-cyan-700:oklch(52% .105 223.128);--color-cyan-800:oklch(45% .085 224.283);--color-cyan-900:oklch(39.8% .07 227.392);--color-cyan-950:oklch(30.2% .056 229.695);--color-sky-50:oklch(97.7% .013 236.62);--color-sky-100:oklch(95.1% .026 236.824);--color-sky-200:oklch(90.1% .058 230.902);--color-sky-300:oklch(82.8% .111 230.318);--color-sky-400:oklch(74.6% .16 232.661);--color-sky-500:oklch(68.5% .169 237.323);--color-sky-600:oklch(58.8% .158 241.966);--color-sky-700:oklch(50% .134 242.749);--color-sky-800:oklch(44.3% .11 240.79);--color-sky-900:oklch(39.1% .09 240.876);--color-sky-950:oklch(29.3% .066 243.157);--color-blue-50:oklch(97% .014 254.604);--color-blue-100:oklch(93.2% .032 255.585);--color-blue-200:oklch(88.2% .059 254.128);--color-blue-300:oklch(80.9% .105 251.813);--color-blue-400:oklch(70.7% .165 254.624);--color-blue-500:oklch(62.3% .214 259.815);--color-blue-600:oklch(54.6% .245 262.881);--color-blue-700:oklch(48.8% .243 264.376);--color-blue-800:oklch(42.4% .199 265.638);--color-blue-900:oklch(37.9% .146 265.522);--color-blue-950:oklch(28.2% .091 267.935);--color-indigo-50:oklch(96.2% .018 272.314);--color-indigo-100:oklch(93% .034 272.788);--color-indigo-200:oklch(87% .065 274.039);--color-indigo-300:oklch(78.5% .115 274.713);--color-indigo-400:oklch(67.3% .182 276.935);--color-indigo-500:oklch(58.5% .233 277.117);--color-indigo-600:oklch(51.1% .262 276.966);--color-indigo-700:oklch(45.7% .24 277.023);--color-indigo-800:oklch(39.8% .195 277.366);--color-indigo-900:oklch(35.9% .144 278.697);--color-indigo-950:oklch(25.7% .09 281.288);--color-violet-50:oklch(96.9% .016 293.756);--color-violet-100:oklch(94.3% .029 294.588);--color-violet-200:oklch(89.4% .057 293.283);--color-violet-300:oklch(81.1% .111 293.571);--color-violet-400:oklch(70.2% .183 293.541);--color-violet-500:oklch(60.6% .25 292.717);--color-violet-600:oklch(54.1% .281 293.009);--color-violet-700:oklch(49.1% .27 292.581);--color-violet-800:oklch(43.2% .232 292.759);--color-violet-900:oklch(38% .189 293.745);--color-violet-950:oklch(28.3% .141 291.089);--color-purple-50:oklch(97.7% .014 308.299);--color-purple-100:oklch(94.6% .033 307.174);--color-purple-200:oklch(90.2% .063 306.703);--color-purple-300:oklch(82.7% .119 306.383);--color-purple-400:oklch(71.4% .203 305.504);--color-purple-500:oklch(62.7% .265 303.9);--color-purple-600:oklch(55.8% .288 302.321);--color-purple-700:oklch(49.6% .265 301.924);--color-purple-800:oklch(43.8% .218 303.724);--color-purple-900:oklch(38.1% .176 304.987);--color-purple-950:oklch(29.1% .149 302.717);--color-fuchsia-50:oklch(97.7% .017 320.058);--color-fuchsia-100:oklch(95.2% .037 318.852);--color-fuchsia-200:oklch(90.3% .076 319.62);--color-fuchsia-300:oklch(83.3% .145 321.434);--color-fuchsia-400:oklch(74% .238 322.16);--color-fuchsia-500:oklch(66.7% .295 322.15);--color-fuchsia-600:oklch(59.1% .293 322.896);--color-fuchsia-700:oklch(51.8% .253 323.949);--color-fuchsia-800:oklch(45.2% .211 324.591);--color-fuchsia-900:oklch(40.1% .17 325.612);--color-fuchsia-950:oklch(29.3% .136 325.661);--color-pink-50:oklch(97.1% .014 343.198);--color-pink-100:oklch(94.8% .028 342.258);--color-pink-200:oklch(89.9% .061 343.231);--color-pink-300:oklch(82.3% .12 346.018);--color-pink-400:oklch(71.8% .202 349.761);--color-pink-500:oklch(65.6% .241 354.308);--color-pink-600:oklch(59.2% .249 .584);--color-pink-700:oklch(52.5% .223 3.958);--color-pink-800:oklch(45.9% .187 3.815);--color-pink-900:oklch(40.8% .153 2.432);--color-pink-950:oklch(28.4% .109 3.907);--color-rose-50:oklch(96.9% .015 12.422);--color-rose-100:oklch(94.1% .03 12.58);--color-rose-200:oklch(89.2% .058 10.001);--color-rose-300:oklch(81% .117 11.638);--color-rose-400:oklch(71.2% .194 13.428);--color-rose-500:oklch(64.5% .246 16.439);--color-rose-600:oklch(58.6% .253 17.585);--color-rose-700:oklch(51.4% .222 16.935);--color-rose-800:oklch(45.5% .188 13.697);--color-rose-900:oklch(41% .159 10.272);--color-rose-950:oklch(27.1% .105 12.094);--color-slate-50:oklch(98.4% .003 247.858);--color-slate-100:oklch(96.8% .007 247.896);--color-slate-200:oklch(92.9% .013 255.508);--color-slate-300:oklch(86.9% .022 252.894);--color-slate-400:oklch(70.4% .04 256.788);--color-slate-500:oklch(55.4% .046 257.417);--color-slate-600:oklch(44.6% .043 257.281);--color-slate-700:oklch(37.2% .044 257.287);--color-slate-800:oklch(27.9% .041 260.031);--color-slate-900:oklch(20.8% .042 265.755);--color-slate-950:oklch(12.9% .042 264.695);--color-gray-50:oklch(98.5% .002 247.839);--color-gray-100:oklch(96.7% .003 264.542);--color-gray-200:oklch(92.8% .006 264.531);--color-gray-300:oklch(87.2% .01 258.338);--color-gray-400:oklch(70.7% .022 261.325);--color-gray-500:oklch(55.1% .027 264.364);--color-gray-600:oklch(44.6% .03 256.802);--color-gray-700:oklch(37.3% .034 259.733);--color-gray-800:oklch(27.8% .033 256.848);--color-gray-900:oklch(21% .034 264.665);--color-gray-950:oklch(13% .028 261.692);--color-zinc-50:oklch(98.5% 0 0);--color-zinc-100:oklch(96.7% .001 286.375);--color-zinc-200:oklch(92% .004 286.32);--color-zinc-300:oklch(87.1% .006 286.286);--color-zinc-400:oklch(70.5% .015 286.067);--color-zinc-500:oklch(55.2% .016 285.938);--color-zinc-600:oklch(44.2% .017 285.786);--color-zinc-700:oklch(37% .013 285.805);--color-zinc-800:oklch(27.4% .006 286.033);--color-zinc-900:oklch(21% .006 285.885);--color-zinc-950:oklch(14.1% .005 285.823);--color-neutral-50:oklch(98.5% 0 0);--color-neutral-100:oklch(97% 0 0);--color-neutral-200:oklch(92.2% 0 0);--color-neutral-300:oklch(87% 0 0);--color-neutral-400:oklch(70.8% 0 0);--color-neutral-500:oklch(55.6% 0 0);--color-neutral-600:oklch(43.9% 0 0);--color-neutral-700:oklch(37.1% 0 0);--color-neutral-800:oklch(26.9% 0 0);--color-neutral-900:oklch(20.5% 0 0);--color-neutral-950:oklch(14.5% 0 0);--color-stone-50:oklch(98.5% .001 106.423);--color-stone-100:oklch(97% .001 106.424);--color-stone-200:oklch(92.3% .003 48.717);--color-stone-300:oklch(86.9% .005 56.366);--color-stone-400:oklch(70.9% .01 56.259);--color-stone-500:oklch(55.3% .013 58.071);--color-stone-600:oklch(44.4% .011 73.639);--color-stone-700:oklch(37.4% .01 67.558);--color-stone-800:oklch(26.8% .007 34.298);--color-stone-900:oklch(21.6% .006 56.043);--color-stone-950:oklch(14.7% .004 49.25);--color-black:#000;--color-white:#fff;--spacing:.25rem;--breakpoint-sm:40rem;--breakpoint-md:48rem;--breakpoint-lg:64rem;--breakpoint-xl:80rem;--breakpoint-2xl:96rem;--container-3xs:16rem;--container-2xs:18rem;--container-xs:20rem;--container-sm:24rem;--container-md:28rem;--container-lg:32rem;--container-xl:36rem;--container-2xl:42rem;--container-3xl:48rem;--container-4xl:56rem;--container-5xl:64rem;--container-6xl:72rem;--container-7xl:80rem;--text-xs:.75rem;--text-xs--line-height:calc(1 / .75);--text-sm:.875rem;--text-sm--line-height:calc(1.25 / .875);--text-base:1rem;--text-base--line-height: 1.5 ;--text-lg:1.125rem;--text-lg--line-height:calc(1.75 / 1.125);--text-xl:1.25rem;--text-xl--line-height:calc(1.75 / 1.25);--text-2xl:1.5rem;--text-2xl--line-height:calc(2 / 1.5);--text-3xl:1.875rem;--text-3xl--line-height: 1.2 ;--text-4xl:2.25rem;--text-4xl--line-height:calc(2.5 / 2.25);--text-5xl:3rem;--text-5xl--line-height:1;--text-6xl:3.75rem;--text-6xl--line-height:1;--text-7xl:4.5rem;--text-7xl--line-height:1;--text-8xl:6rem;--text-8xl--line-height:1;--text-9xl:8rem;--text-9xl--line-height:1;--font-weight-thin:100;--font-weight-extralight:200;--font-weight-light:300;--font-weight-normal:400;--font-weight-medium:500;--font-weight-semibold:600;--font-weight-bold:700;--font-weight-extrabold:800;--font-weight-black:900;--tracking-tighter:-.05em;--tracking-tight:-.025em;--tracking-normal:0em;--tracking-wide:.025em;--tracking-wider:.05em;--tracking-widest:.1em;--leading-tight:1.25;--leading-snug:1.375;--leading-normal:1.5;--leading-relaxed:1.625;--leading-loose:2;--radius-xs:.125rem;--radius-sm:.25rem;--radius-md:.375rem;--radius-lg:.5rem;--radius-xl:.75rem;--radius-2xl:1rem;--radius-3xl:1.5rem;--radius-4xl:2rem;--shadow-2xs:0 1px #0000000d;--shadow-xs:0 1px 2px 0 #0000000d;--shadow-sm:0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a;--shadow-md:0 4px 6px -1px #0000001a, 0 2px 4px -2px #0000001a;--shadow-lg:0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;--shadow-xl:0 20px 25px -5px #0000001a, 0 8px 10px -6px #0000001a;--shadow-2xl:0 25px 50px -12px #00000040;--inset-shadow-2xs:inset 0 1px #0000000d;--inset-shadow-xs:inset 0 1px 1px #0000000d;--inset-shadow-sm:inset 0 2px 4px #0000000d;--drop-shadow-xs:0 1px 1px #0000000d;--drop-shadow-sm:0 1px 2px #00000026;--drop-shadow-md:0 3px 3px #0000001f;--drop-shadow-lg:0 4px 4px #00000026;--drop-shadow-xl:0 9px 7px #0000001a;--drop-shadow-2xl:0 25px 25px #00000026;--ease-in:cubic-bezier(.4, 0, 1, 1);--ease-out:cubic-bezier(0, 0, .2, 1);--ease-in-out:cubic-bezier(.4, 0, .2, 1);--animate-spin:spin 1s linear infinite;--animate-ping:ping 1s cubic-bezier(0, 0, .2, 1) infinite;--animate-pulse:pulse 2s cubic-bezier(.4, 0, .6, 1) infinite;--animate-bounce:bounce 1s infinite;--blur-xs:4px;--blur-sm:8px;--blur-md:12px;--blur-lg:16px;--blur-xl:24px;--blur-2xl:40px;--blur-3xl:64px;--perspective-dramatic:100px;--perspective-near:300px;--perspective-normal:500px;--perspective-midrange:800px;--perspective-distant:1200px;--aspect-video:16 / 9;--default-transition-duration:.15s;--default-transition-timing-function:cubic-bezier(.4, 0, .2, 1);--default-font-family:var(--font-sans);--default-mono-font-family:var(--font-mono)}}@layer base{*,:after,:before,::backdrop{box-sizing:border-box;border:0 solid;margin:0;padding:0}::file-selector-button{box-sizing:border-box;border:0 solid;margin:0;padding:0}html,:host{-webkit-text-size-adjust:100%;tab-size:4;line-height:1.5;font-family:var(--default-font-family,ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");font-feature-settings:var(--default-font-feature-settings,normal);font-variation-settings:var(--default-font-variation-settings,normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var(--default-mono-font-family,ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);font-feature-settings:var(--default-mono-font-feature-settings,normal);font-variation-settings:var(--default-mono-font-variation-settings,normal);font-size:1em}small{font-size:80%}sub,sup{vertical-align:baseline;font-size:75%;line-height:0;position:relative}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{vertical-align:middle;display:block}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;opacity:1;background-color:#0000;border-radius:0}::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;opacity:1;background-color:#0000;border-radius:0}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not ((-webkit-appearance:-apple-pay-button))) or (contain-intrinsic-size:1px){::placeholder{color:currentColor}@supports (color:color-mix(in lab,red,red)){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit{padding-block:0}::-webkit-datetime-edit-year-field{padding-block:0}::-webkit-datetime-edit-month-field{padding-block:0}::-webkit-datetime-edit-day-field{padding-block:0}::-webkit-datetime-edit-hour-field{padding-block:0}::-webkit-datetime-edit-minute-field{padding-block:0}::-webkit-datetime-edit-second-field{padding-block:0}::-webkit-datetime-edit-millisecond-field{padding-block:0}::-webkit-datetime-edit-meridiem-field{padding-block:0}::-webkit-calendar-picker-indicator{line-height:1}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]){appearance:button}::file-selector-button{appearance:button}::-webkit-inner-spin-button{height:auto}::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}}@layer components;@layer utilities{.absolute{position:absolute}.fixed{position:fixed}.relative{position:relative}.static{position:static}.inset-0{inset:calc(var(--spacing) * 0)}.start{inset-inline-start:var(--spacing)}.top-0{top:calc(var(--spacing) * 0)}.right-0{right:calc(var(--spacing) * 0)}.container{width:100%}@media(min-width:40rem){.container{max-width:40rem}}@media(min-width:48rem){.container{max-width:48rem}}@media(min-width:64rem){.container{max-width:64rem}}@media(min-width:80rem){.container{max-width:80rem}}@media(min-width:96rem){.container{max-width:96rem}}.mx-auto{margin-inline:auto}.-mt-\[6\.6rem\]{margin-top:-6.6rem}.-mt-px{margin-top:-1px}.mt-2{margin-top:calc(var(--spacing) * 2)}.mt-4{margin-top:calc(var(--spacing) * 4)}.mt-6{margin-top:calc(var(--spacing) * 6)}.mt-8{margin-top:calc(var(--spacing) * 8)}.mr-2{margin-right:calc(var(--spacing) * 2)}.-mb-px{margin-bottom:-1px}.mb-1{margin-bottom:calc(var(--spacing) * 1)}.mb-2{margin-bottom:calc(var(--spacing) * 2)}.mb-4{margin-bottom:calc(var(--spacing) * 4)}.mb-6{margin-bottom:calc(var(--spacing) * 6)}.-ml-8{margin-left:calc(var(--spacing) * -8)}.-ml-px{margin-left:-1px}.ml-1{margin-left:calc(var(--spacing) * 1)}.ml-2{margin-left:calc(var(--spacing) * 2)}.ml-4{margin-left:calc(var(--spacing) * 4)}.ml-12{margin-left:calc(var(--spacing) * 12)}.contents{display:contents}.flex{display:flex}.grid{display:grid}.hidden{display:none}.inline-block{display:inline-block}.inline-flex{display:inline-flex}.table{display:table}.aspect-\[335\/364\]{aspect-ratio:335/364}.h-1{height:calc(var(--spacing) * 1)}.h-1\.5{height:calc(var(--spacing) * 1.5)}.h-2{height:calc(var(--spacing) * 2)}.h-2\.5{height:calc(var(--spacing) * 2.5)}.h-3{height:calc(var(--spacing) * 3)}.h-3\.5{height:calc(var(--spacing) * 3.5)}.h-5{height:calc(var(--spacing) * 5)}.h-8{height:calc(var(--spacing) * 8)}.h-14{height:calc(var(--spacing) * 14)}.h-14\.5{height:calc(var(--spacing) * 14.5)}.h-16{height:calc(var(--spacing) * 16)}.min-h-screen{min-height:100vh}.w-1{width:calc(var(--spacing) * 1)}.w-1\.5{width:calc(var(--spacing) * 1.5)}.w-2{width:calc(var(--spacing) * 2)}.w-2\.5{width:calc(var(--spacing) * 2.5)}.w-3{width:calc(var(--spacing) * 3)}.w-3\.5{width:calc(var(--spacing) * 3.5)}.w-5{width:calc(var(--spacing) * 5)}.w-8{width:calc(var(--spacing) * 8)}.w-\[438px\]{width:438px}.w-auto{width:auto}.w-full{width:100%}.max-w-6xl{max-width:var(--container-6xl)}.max-w-\[335px\]{max-width:335px}.max-w-none{max-width:none}.max-w-xl{max-width:var(--container-xl)}.flex-1{flex:1}.shrink-0{flex-shrink:0}.translate-y-0{--tw-translate-y:calc(var(--spacing) * 0);translate:var(--tw-translate-x) var(--tw-translate-y)}.transform{transform:var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,)}.cursor-default{cursor:default}.cursor-not-allowed{cursor:not-allowed}.grid-cols-1{grid-template-columns:repeat(1,minmax(0,1fr))}.flex-col{flex-direction:column}.flex-col-reverse{flex-direction:column-reverse}.items-center{align-items:center}.justify-between{justify-content:space-between}.justify-center{justify-content:center}.justify-end{justify-content:flex-end}.justify-items-center{justify-items:center}.gap-2{gap:calc(var(--spacing) * 2)}.gap-3{gap:calc(var(--spacing) * 3)}.gap-4{gap:calc(var(--spacing) * 4)}:where(.space-x-1>:not(:last-child)){--tw-space-x-reverse:0;margin-inline-start:calc(calc(var(--spacing) * 1) * var(--tw-space-x-reverse));margin-inline-end:calc(calc(var(--spacing) * 1) * calc(1 - var(--tw-space-x-reverse)))}.overflow-hidden{overflow:hidden}.rounded-full{border-radius:3.40282e38px}.rounded-md{border-radius:var(--radius-md)}.rounded-sm{border-radius:var(--radius-sm)}.rounded-t-lg{border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg)}.rounded-l-md{border-top-left-radius:var(--radius-md);border-bottom-left-radius:var(--radius-md)}.rounded-r-md{border-top-right-radius:var(--radius-md);border-bottom-right-radius:var(--radius-md)}.rounded-br-lg{border-bottom-right-radius:var(--radius-lg)}.rounded-bl-lg{border-bottom-left-radius:var(--radius-lg)}.border{border-style:var(--tw-border-style);border-width:1px}.border-t{border-top-style:var(--tw-border-style);border-top-width:1px}.border-r{border-right-style:var(--tw-border-style);border-right-width:1px}.border-\[\#19140035\]{border-color:#19140035}.border-\[\#e3e3e0\]{border-color:#e3e3e0}.border-black{border-color:var(--color-black)}.border-gray-200{border-color:var(--color-gray-200)}.border-gray-300{border-color:var(--color-gray-300)}.border-gray-400{border-color:var(--color-gray-400)}.border-transparent{border-color:#0000}.bg-\[\#1b1b18\]{background-color:#1b1b18}.bg-\[\#FDFDFC\]{background-color:#fdfdfc}.bg-\[\#dbdbd7\]{background-color:#dbdbd7}.bg-\[\#fff2f2\]{background-color:#fff2f2}.bg-gray-100{background-color:var(--color-gray-100)}.bg-gray-200{background-color:var(--color-gray-200)}.bg-white{background-color:var(--color-white)}.p-6{padding:calc(var(--spacing) * 6)}.px-2{padding-inline:calc(var(--spacing) * 2)}.px-4{padding-inline:calc(var(--spacing) * 4)}.px-5{padding-inline:calc(var(--spacing) * 5)}.px-6{padding-inline:calc(var(--spacing) * 6)}.py-1{padding-block:calc(var(--spacing) * 1)}.py-1\.5{padding-block:calc(var(--spacing) * 1.5)}.py-2{padding-block:calc(var(--spacing) * 2)}.py-4{padding-block:calc(var(--spacing) * 4)}.pt-8{padding-top:calc(var(--spacing) * 8)}.pb-6{padding-bottom:calc(var(--spacing) * 6)}.pb-12{padding-bottom:calc(var(--spacing) * 12)}.text-center{text-align:center}.text-lg{font-size:var(--text-lg);line-height:var(--tw-leading,var(--text-lg--line-height))}.text-sm{font-size:var(--text-sm);line-height:var(--tw-leading,var(--text-sm--line-height))}.text-\[13px\]{font-size:13px}.leading-5{--tw-leading:calc(var(--spacing) * 5);line-height:calc(var(--spacing) * 5)}.leading-7{--tw-leading:calc(var(--spacing) * 7);line-height:calc(var(--spacing) * 7)}.leading-\[20px\]{--tw-leading:20px;line-height:20px}.leading-normal{--tw-leading:var(--leading-normal);line-height:var(--leading-normal)}.font-medium{--tw-font-weight:var(--font-weight-medium);font-weight:var(--font-weight-medium)}.font-semibold{--tw-font-weight:var(--font-weight-semibold);font-weight:var(--font-weight-semibold)}.tracking-wider{--tw-tracking:var(--tracking-wider);letter-spacing:var(--tracking-wider)}.text-\[\#1B1B18\],.text-\[\#1b1b18\]{color:#1b1b18}.text-\[\#706f6c\]{color:#706f6c}.text-\[\#F3BEC7\]{color:#f3bec7}.text-\[\#F8B803\]{color:#f8b803}.text-\[\#F53003\],.text-\[\#f53003\]{color:#f53003}.text-gray-200{color:var(--color-gray-200)}.text-gray-300{color:var(--color-gray-300)}.text-gray-400{color:var(--color-gray-400)}.text-gray-500{color:var(--color-gray-500)}.text-gray-600{color:var(--color-gray-600)}.text-gray-700{color:var(--color-gray-700)}.text-gray-800{color:var(--color-gray-800)}.text-gray-900{color:var(--color-gray-900)}.text-white{color:var(--color-white)}.uppercase{text-transform:uppercase}.underline{text-decoration-line:underline}.underline-offset-4{text-underline-offset:4px}.antialiased{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.opacity-100{opacity:1}.mix-blend-color{mix-blend-mode:color}.mix-blend-darken{mix-blend-mode:darken}.mix-blend-hard-light{mix-blend-mode:hard-light}.mix-blend-multiply{mix-blend-mode:multiply}.shadow{--tw-shadow:0 1px 3px 0 var(--tw-shadow-color,#0000001a), 0 1px 2px -1px var(--tw-shadow-color,#0000001a);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.shadow-\[0px_0px_1px_0px_rgba\(0\,0\,0\,0\.03\)\,0px_1px_2px_0px_rgba\(0\,0\,0\,0\.06\)\]{--tw-shadow:0px 0px 1px 0px var(--tw-shadow-color,#00000008), 0px 1px 2px 0px var(--tw-shadow-color,#0000000f);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.shadow-\[inset_0px_0px_0px_1px_rgba\(26\,26\,0\,0\.16\)\]{--tw-shadow:inset 0px 0px 0px 1px var(--tw-shadow-color,#1a1a0029);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.shadow-sm{--tw-shadow:0 1px 3px 0 var(--tw-shadow-color,#0000001a), 0 1px 2px -1px var(--tw-shadow-color,#0000001a);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.ring-gray-300{--tw-ring-color:var(--color-gray-300)}.filter{filter:var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,)}.transition{transition-property:color,background-color,border-color,outline-color,text-decoration-color,fill,stroke,--tw-gradient-from,--tw-gradient-via,--tw-gradient-to,opacity,box-shadow,transform,translate,scale,rotate,filter,-webkit-backdrop-filter,backdrop-filter,display,content-visibility,overlay,pointer-events;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-all{transition-property:all;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-opacity{transition-property:opacity;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.delay-200{transition-delay:.2s}.delay-300{transition-delay:.3s}.delay-400{transition-delay:.4s}.duration-150{--tw-duration:.15s;transition-duration:.15s}.duration-750{--tw-duration:.75s;transition-duration:.75s}.ease-in-out{--tw-ease:var(--ease-in-out);transition-timing-function:var(--ease-in-out)}.\[--stroke-color\:\#1B1B18\]{--stroke-color:#1b1b18}.not-has-\[nav\]\:hidden:not(:has(:is(nav))){display:none}.before\:absolute:before{content:var(--tw-content);position:absolute}.before\:top-0:before{content:var(--tw-content);top:calc(var(--spacing) * 0)}.before\:top-1\/2:before{content:var(--tw-content);top:50%}.before\:bottom-0:before{content:var(--tw-content);bottom:calc(var(--spacing) * 0)}.before\:bottom-1\/2:before{content:var(--tw-content);bottom:50%}.before\:left-\[0\.4rem\]:before{content:var(--tw-content);left:.4rem}.before\:border-l:before{content:var(--tw-content);border-left-style:var(--tw-border-style);border-left-width:1px}.before\:border-\[\#e3e3e0\]:before{content:var(--tw-content);border-color:#e3e3e0}@media(hover:hover){.hover\:border-\[\#1915014a\]:hover{border-color:#1915014a}.hover\:border-\[\#19140035\]:hover{border-color:#19140035}.hover\:border-black:hover{border-color:var(--color-black)}.hover\:bg-black:hover{background-color:var(--color-black)}.hover\:bg-gray-100:hover{background-color:var(--color-gray-100)}.hover\:text-gray-400:hover{color:var(--color-gray-400)}.hover\:text-gray-700:hover{color:var(--color-gray-700)}}.focus\:border-blue-300:focus{border-color:var(--color-blue-300)}.focus\:ring:focus{--tw-ring-shadow:var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color,currentcolor);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.focus\:outline-none:focus{--tw-outline-style:none;outline-style:none}.active\:bg-gray-100:active{background-color:var(--color-gray-100)}.active\:text-gray-500:active{color:var(--color-gray-500)}.active\:text-gray-700:active{color:var(--color-gray-700)}.active\:text-gray-800:active{color:var(--color-gray-800)}@media(min-width:40rem){.sm\:flex{display:flex}.sm\:hidden{display:none}.sm\:flex-1{flex:1}.sm\:items-center{align-items:center}.sm\:justify-between{justify-content:space-between}.sm\:justify-start{justify-content:flex-start}.sm\:gap-2{gap:calc(var(--spacing) * 2)}.sm\:px-6{padding-inline:calc(var(--spacing) * 6)}.sm\:pt-0{padding-top:calc(var(--spacing) * 0)}}@media(min-width:64rem){.lg\:mt-10{margin-top:calc(var(--spacing) * 10)}.lg\:mb-0{margin-bottom:calc(var(--spacing) * 0)}.lg\:mb-6{margin-bottom:calc(var(--spacing) * 6)}.lg\:-ml-px{margin-left:-1px}.lg\:ml-0{margin-left:calc(var(--spacing) * 0)}.lg\:block{display:block}.lg\:aspect-auto{aspect-ratio:auto}.lg\:w-\[438px\]{width:438px}.lg\:max-w-4xl{max-width:var(--container-4xl)}.lg\:grow{flex-grow:1}.lg\:flex-row{flex-direction:row}.lg\:justify-center{justify-content:center}.lg\:rounded-t-none{border-top-left-radius:0;border-top-right-radius:0}.lg\:rounded-tl-lg{border-top-left-radius:var(--radius-lg)}.lg\:rounded-r-lg{border-top-right-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg)}.lg\:rounded-br-none{border-bottom-right-radius:0}.lg\:p-8{padding:calc(var(--spacing) * 8)}.lg\:p-20{padding:calc(var(--spacing) * 20)}.lg\:px-8{padding-inline:calc(var(--spacing) * 8)}.lg\:pb-10{padding-bottom:calc(var(--spacing) * 10)}}.rtl\:flex-row-reverse:where(:dir(rtl),[dir=rtl],[dir=rtl] *){flex-direction:row-reverse}@media(prefers-color-scheme:dark){.dark\:border-\[\#3E3E3A\]{border-color:#3e3e3a}.dark\:border-\[\#eeeeec\]{border-color:#eeeeec}.dark\:border-gray-600{border-color:var(--color-gray-600)}.dark\:bg-\[\#0a0a0a\]{background-color:#0a0a0a}.dark\:bg-\[\#1D0002\]{background-color:#1d0002}.dark\:bg-\[\#3E3E3A\]{background-color:#3e3e3a}.dark\:bg-\[\#161615\]{background-color:#161615}.dark\:bg-\[\#eeeeec\]{background-color:#eeeeec}.dark\:bg-gray-700{background-color:var(--color-gray-700)}.dark\:bg-gray-800{background-color:var(--color-gray-800)}.dark\:bg-gray-900{background-color:var(--color-gray-900)}.dark\:text-\[\#1C1C1A\]{color:#1c1c1a}.dark\:text-\[\#4B0600\]{color:#4b0600}.dark\:text-\[\#391800\]{color:#391800}.dark\:text-\[\#733000\]{color:#733000}.dark\:text-\[\#A1A09A\]{color:#a1a09a}.dark\:text-\[\#EDEDEC\]{color:#ededec}.dark\:text-\[\#F61500\]{color:#f61500}.dark\:text-\[\#FF4433\]{color:#f43}.dark\:text-black{color:var(--color-black)}.dark\:text-gray-200{color:var(--color-gray-200)}.dark\:text-gray-300{color:var(--color-gray-300)}.dark\:text-gray-400{color:var(--color-gray-400)}.dark\:text-gray-600{color:var(--color-gray-600)}.dark\:mix-blend-hard-light{mix-blend-mode:hard-light}.dark\:mix-blend-normal{mix-blend-mode:normal}.dark\:shadow-\[inset_0px_0px_0px_1px_\#fffaed2d\]{--tw-shadow:inset 0px 0px 0px 1px var(--tw-shadow-color,#fffaed2d);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.dark\:\[--stroke-color\:\#FF750F\]{--stroke-color:#ff750f}.dark\:before\:border-\[\#3E3E3A\]:before{content:var(--tw-content);border-color:#3e3e3a}@media(hover:hover){.dark\:hover\:border-\[\#3E3E3A\]:hover{border-color:#3e3e3a}.dark\:hover\:border-\[\#62605b\]:hover{border-color:#62605b}.dark\:hover\:border-white:hover{border-color:var(--color-white)}.dark\:hover\:bg-gray-900:hover{background-color:var(--color-gray-900)}.dark\:hover\:bg-white:hover{background-color:var(--color-white)}.dark\:hover\:text-gray-200:hover{color:var(--color-gray-200)}.dark\:hover\:text-gray-300:hover{color:var(--color-gray-300)}}.dark\:focus\:border-blue-700:focus{border-color:var(--color-blue-700)}.dark\:focus\:border-blue-800:focus{border-color:var(--color-blue-800)}.dark\:active\:bg-gray-700:active{background-color:var(--color-gray-700)}.dark\:active\:text-gray-300:active{color:var(--color-gray-300)}}@starting-style{.starting\:opacity-0{opacity:0}}@media(prefers-reduced-motion:no-preference){@starting-style{.motion-safe\:starting\:-translate-x-\[26px\]{--tw-translate-x: -26px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:-translate-x-\[51px\]{--tw-translate-x: -51px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:-translate-x-\[78px\]{--tw-translate-x: -78px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:-translate-x-\[102px\]{--tw-translate-x: -102px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:translate-y-6{--tw-translate-y:calc(var(--spacing) * 6);translate:var(--tw-translate-x) var(--tw-translate-y)}}}}@property --tw-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-z{syntax:"*";inherits:false;initial-value:0}@property --tw-rotate-x{syntax:"*";inherits:false}@property --tw-rotate-y{syntax:"*";inherits:false}@property --tw-rotate-z{syntax:"*";inherits:false}@property --tw-skew-x{syntax:"*";inherits:false}@property --tw-skew-y{syntax:"*";inherits:false}@property --tw-space-x-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-leading{syntax:"*";inherits:false}@property --tw-font-weight{syntax:"*";inherits:false}@property --tw-tracking{syntax:"*";inherits:false}@property --tw-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-shadow-color{syntax:"*";inherits:false}@property --tw-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-inset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-shadow-color{syntax:"*";inherits:false}@property --tw-inset-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-ring-color{syntax:"*";inherits:false}@property --tw-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-ring-color{syntax:"*";inherits:false}@property --tw-inset-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-ring-inset{syntax:"*";inherits:false}@property --tw-ring-offset-width{syntax:"<length>";inherits:false;initial-value:0}@property --tw-ring-offset-color{syntax:"*";inherits:false;initial-value:#fff}@property --tw-ring-offset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-blur{syntax:"*";inherits:false}@property --tw-brightness{syntax:"*";inherits:false}@property --tw-contrast{syntax:"*";inherits:false}@property --tw-grayscale{syntax:"*";inherits:false}@property --tw-hue-rotate{syntax:"*";inherits:false}@property --tw-invert{syntax:"*";inherits:false}@property --tw-opacity{syntax:"*";inherits:false}@property --tw-saturate{syntax:"*";inherits:false}@property --tw-sepia{syntax:"*";inherits:false}@property --tw-drop-shadow{syntax:"*";inherits:false}@property --tw-drop-shadow-color{syntax:"*";inherits:false}@property --tw-drop-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-drop-shadow-size{syntax:"*";inherits:false}@property --tw-duration{syntax:"*";inherits:false}@property --tw-ease{syntax:"*";inherits:false}@property --tw-content{syntax:"*";inherits:false;initial-value:""}@keyframes spin{to{transform:rotate(360deg)}}@keyframes ping{75%,to{opacity:0;transform:scale(2)}}@keyframes pulse{50%{opacity:.5}}@keyframes bounce{0%,to{animation-timing-function:cubic-bezier(.8,0,1,1);transform:translateY(-25%)}50%{animation-timing-function:cubic-bezier(0,0,.2,1);transform:none}}
-            </style>
-        @endif
-    </head>
-    <body class="bg-[#FDFDFC] dark:bg-[#0a0a0a] text-[#1b1b18] flex p-6 lg:p-8 items-center lg:justify-center min-h-screen flex-col">
-        <header class="w-full lg:max-w-4xl max-w-[335px] text-sm mb-6 not-has-[nav]:hidden">
-            @if (Route::has('login'))
-                <nav class="flex items-center justify-end gap-4">
-                    @auth
-                        <a
-                            href="{{ url('/dashboard') }}"
-                            class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] border-[#19140035] hover:border-[#1915014a] border text-[#1b1b18] dark:border-[#3E3E3A] dark:hover:border-[#62605b] rounded-sm text-sm leading-normal"
-                        >
-                            Dashboard
-                        </a>
-                    @else
-                        <a
-                            href="{{ route('login') }}"
-                            class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] text-[#1b1b18] border border-transparent hover:border-[#19140035] dark:hover:border-[#3E3E3A] rounded-sm text-sm leading-normal"
-                        >
-                            Log in
-                        </a>
+    <script src="/js/report-flow.js?v={{ time() }}"></script>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased min-h-screen">
 
-                        @if (Route::has('register'))
-                            <a
-                                href="{{ route('register') }}"
-                                class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] border-[#19140035] hover:border-[#1915014a] border text-[#1b1b18] dark:border-[#3E3E3A] dark:hover:border-[#62605b] rounded-sm text-sm leading-normal">
-                                Register
-                            </a>
-                        @endif
-                    @endauth
-                </nav>
-            @endif
+    <div x-data="reportFlow" class="max-w-lg mx-auto min-h-screen bg-white shadow-xl flex flex-col justify-between">
+
+        <!-- Topo / Barra de Status -->
+        <header class="bg-gray-800 text-white px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 border-b border-gray-700" style="background-color: #111827;">
+            <div>
+                <h1 class="text-base font-bold tracking-wide text-white">FotoOS</h1>
+                <p class="text-[11px] text-gray-400">Manserv Facilities</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span x-show="!isOnline" x-cloak class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white">
+                    Offline
+                </span>
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                      :class="step === 3 ? 'bg-emerald-600' : 'bg-blue-600'"
+                      x-text="step === 1 ? 'Etapa 1 de 2' : (step === 2 ? 'Etapa 2 de 2' : 'Concluído')">
+                    Etapa 1 de 2
+                </span>
+            </div>
         </header>
-        <div class="flex items-center justify-center w-full transition-opacity opacity-100 duration-750 lg:grow starting:opacity-0">
-            <main class="flex max-w-[335px] w-full flex-col-reverse lg:max-w-4xl lg:flex-row">
-                <div class="text-[13px] leading-[20px] flex-1 p-6 pb-6 lg:p-20 lg:pb-10 bg-white dark:bg-[#161615] dark:text-[#EDEDEC] shadow-[inset_0px_0px_0px_1px_rgba(26,26,0,0.16)] dark:shadow-[inset_0px_0px_0px_1px_#fffaed2d] rounded-bl-lg rounded-br-lg lg:rounded-tl-lg lg:rounded-br-none">
-                    <h1 class="mb-1 font-medium">Let's get started</h1>
-                    <p class="mb-2 text-[#706f6c] dark:text-[#A1A09A]">With so many options available to you,<br /> we suggest you start with the following:</p>
-                    <ul class="flex flex-col mb-4 lg:mb-6">
-                        <li class="flex items-center gap-4 py-2 relative before:border-l before:border-[#e3e3e0] dark:before:border-[#3E3E3A] before:top-1/2 before:bottom-0 before:left-[0.4rem] before:absolute">
-                            <span class="relative py-1 bg-white dark:bg-[#161615]">
-                                <span class="flex items-center justify-center rounded-full bg-[#FDFDFC] dark:bg-[#161615] shadow-[0px_0px_1px_0px_rgba(0,0,0,0.03),0px_1px_2px_0px_rgba(0,0,0,0.06)] w-3.5 h-3.5 border dark:border-[#3E3E3A] border-[#e3e3e0]">
-                                    <span class="rounded-full bg-[#dbdbd7] dark:bg-[#3E3E3A] w-1.5 h-1.5"></span>
-                                </span>
-                            </span>
-                            <span>
-                                Read the
-                                <a href="https://laravel.com/docs" target="_blank" class="inline-flex items-center space-x-1 font-medium underline underline-offset-4 text-[#f53003] dark:text-[#FF4433] ml-1">
-                                    <span>Documentation</span>
-                                    <svg
-                                        width="10"
-                                        height="11"
-                                        viewBox="0 0 10 11"
-                                        fill="none"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        class="w-2.5 h-2.5"
-                                    >
-                                        <path
-                                            d="M7.70833 6.95834V2.79167H3.54167M2.5 8L7.5 3.00001"
-                                            stroke="currentColor"
-                                            stroke-linecap="square"
-                                        />
-                                    </svg>
-                                </a>
-                            </span>
-                        </li>
-                        <li class="flex items-center gap-4 py-2 relative before:border-l before:border-[#e3e3e0] dark:before:border-[#3E3E3A] before:bottom-1/2 before:top-0 before:left-[0.4rem] before:absolute">
-                            <span class="relative py-1 bg-white dark:bg-[#161615]">
-                                <span class="flex items-center justify-center rounded-full bg-[#FDFDFC] dark:bg-[#161615] shadow-[0px_0px_1px_0px_rgba(0,0,0,0.03),0px_1px_2px_0px_rgba(0,0,0,0.06)] w-3.5 h-3.5 border dark:border-[#3E3E3A] border-[#e3e3e0]">
-                                    <span class="rounded-full bg-[#dbdbd7] dark:bg-[#3E3E3A] w-1.5 h-1.5"></span>
-                                </span>
-                            </span>
-                            <span>
-                                Watch video tutorials at
-                                <a href="https://laracasts.com" target="_blank" class="inline-flex items-center space-x-1 font-medium underline underline-offset-4 text-[#f53003] dark:text-[#FF4433] ml-1">
-                                    <span>Laracasts</span>
-                                    <svg
-                                        width="10"
-                                        height="11"
-                                        viewBox="0 0 10 11"
-                                        fill="none"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        class="w-2.5 h-2.5"
-                                    >
-                                        <path
-                                            d="M7.70833 6.95834V2.79167H3.54167M2.5 8L7.5 3.00001"
-                                            stroke="currentColor"
-                                            stroke-linecap="square"
-                                        />
-                                    </svg>
-                                </a>
-                            </span>
-                        </li>
-                    </ul>
-                    <ul class="flex gap-3 text-sm leading-normal">
-                        <li>
-                            <a href="https://cloud.laravel.com" target="_blank" class="inline-block dark:bg-[#eeeeec] dark:border-[#eeeeec] dark:text-[#1C1C1A] dark:hover:bg-white dark:hover:border-white hover:bg-black hover:border-black px-5 py-1.5 bg-[#1b1b18] rounded-sm border border-black text-white text-sm leading-normal">
-                                Deploy now
-                            </a>
-                        </li>
-                    </ul>
 
-                    <p class="mt-6 lg:mt-10 text-[#706f6c] dark:text-[#A1A09A]">
-                        v{{ app()->version() }}
-                        <a href="https://github.com/laravel/framework/blob/13.x/CHANGELOG.md" target="_blank" class="inline-flex items-center space-x-1 font-medium underline underline-offset-4 text-[#f53003] dark:text-[#FF4433] ml-1">
-                            <span>View changelog</span>
-                            <svg
-                                width="10"
-                                height="11"
-                                viewBox="0 0 10 11"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="w-2.5 h-2.5"
-                            >
-                                <path
-                                    d="M7.70833 6.95834V2.79167H3.54167M2.5 8L7.5 3.00001"
-                                    stroke="currentColor"
-                                    stroke-linecap="square"
-                                />
-                            </svg>
-                        </a>
-                    </p>
-                </div>
-                <div class="bg-[#fff2f2] dark:bg-[#1D0002] relative lg:-ml-px -mb-px lg:mb-0 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg aspect-[335/364] lg:aspect-auto w-full lg:w-[438px] shrink-0 overflow-hidden">
-                    {{-- Laravel Logo --}}
-                    <svg class="w-full text-[#F53003] dark:text-[#F61500] transition-all translate-y-0 opacity-100 max-w-none duration-750 starting:opacity-0 motion-safe:starting:translate-y-6" viewBox="0 0 438 104" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17.2036 -3H0V102.197H49.5189V86.7187H17.2036V-3Z" fill="currentColor" />
-                        <path d="M110.256 41.6337C108.061 38.1275 104.945 35.3731 100.905 33.3681C96.8667 31.3647 92.8016 30.3618 88.7131 30.3618C83.4247 30.3618 78.5885 31.3389 74.201 33.2923C69.8111 35.2456 66.0474 37.928 62.9059 41.3333C59.7643 44.7401 57.3198 48.6726 55.5754 53.1293C53.8287 57.589 52.9572 62.274 52.9572 67.1813C52.9572 72.1925 53.8287 76.8995 55.5754 81.3069C57.3191 85.7173 59.7636 89.6241 62.9059 93.0293C66.0474 96.4361 69.8119 99.1155 74.201 101.069C78.5885 103.022 83.4247 103.999 88.7131 103.999C92.8016 103.999 96.8667 102.997 100.905 100.994C104.945 98.9911 108.061 96.2359 110.256 92.7282V102.195H126.563V32.1642H110.256V41.6337ZM108.76 75.7472C107.762 78.4531 106.366 80.8078 104.572 82.8112C102.776 84.8161 100.606 86.4183 98.0637 87.6206C95.5202 88.823 92.7004 89.4238 89.6103 89.4238C86.5178 89.4238 83.7252 88.823 81.2324 87.6206C78.7388 86.4183 76.5949 84.8161 74.7998 82.8112C73.004 80.8078 71.6319 78.4531 70.6856 75.7472C69.7356 73.0421 69.2644 70.1868 69.2644 67.1821C69.2644 64.1758 69.7356 61.3205 70.6856 58.6154C71.6319 55.9102 73.004 53.5571 74.7998 51.5522C76.5949 49.5495 78.738 47.9451 81.2324 46.7427C83.7252 45.5404 86.5178 44.9396 89.6103 44.9396C92.7012 44.9396 95.5202 45.5404 98.0637 46.7427C100.606 47.9451 102.776 49.5487 104.572 51.5522C106.367 53.5571 107.762 55.9102 108.76 58.6154C109.756 61.3205 110.256 64.1758 110.256 67.1821C110.256 70.1868 109.756 73.0421 108.76 75.7472Z" fill="currentColor" />
-                        <path d="M242.805 41.6337C240.611 38.1275 237.494 35.3731 233.455 33.3681C229.416 31.3647 225.351 30.3618 221.262 30.3618C215.974 30.3618 211.138 31.3389 206.75 33.2923C202.36 35.2456 198.597 37.928 195.455 41.3333C192.314 44.7401 189.869 48.6726 188.125 53.1293C186.378 57.589 185.507 62.274 185.507 67.1813C185.507 72.1925 186.378 76.8995 188.125 81.3069C189.868 85.7173 192.313 89.6241 195.455 93.0293C198.597 96.4361 202.361 99.1155 206.75 101.069C211.138 103.022 215.974 103.999 221.262 103.999C225.351 103.999 229.416 102.997 233.455 100.994C237.494 98.9911 240.611 96.2359 242.805 92.7282V102.195H259.112V32.1642H242.805V41.6337ZM241.31 75.7472C240.312 78.4531 238.916 80.8078 237.122 82.8112C235.326 84.8161 233.156 86.4183 230.614 87.6206C228.07 88.823 225.251 89.4238 222.16 89.4238C219.068 89.4238 216.275 88.823 213.782 87.6206C211.289 86.4183 209.145 84.8161 207.35 82.8112C205.554 80.8078 204.182 78.4531 203.236 75.7472C202.286 73.0421 201.814 70.1868 201.814 67.1821C201.814 64.1758 202.286 61.3205 203.236 58.6154C204.182 55.9102 205.554 53.5571 207.35 51.5522C209.145 49.5495 211.288 47.9451 213.782 46.7427C216.275 45.5404 219.068 44.9396 222.16 44.9396C225.251 44.9396 228.07 45.5404 230.614 46.7427C233.156 47.9451 235.326 49.5487 237.122 51.5522C238.917 53.5571 240.312 55.9102 241.31 58.6154C242.306 61.3205 242.806 64.1758 242.806 67.1821C242.805 70.1868 242.305 73.0421 241.31 75.7472Z" fill="currentColor" />
-                        <path d="M438 -3H421.694V102.197H438V-3Z" fill="currentColor" />
-                        <path d="M139.43 102.197H155.735V48.2834H183.712V32.1665H139.43V102.197Z" fill="currentColor" />
-                        <path d="M324.49 32.1665L303.995 85.794L283.498 32.1665H266.983L293.748 102.197H314.242L341.006 32.1665H324.49Z" fill="currentColor" />
-                        <path d="M376.571 30.3656C356.603 30.3656 340.797 46.8497 340.797 67.1828C340.797 89.6597 356.094 104 378.661 104C391.29 104 399.354 99.1488 409.206 88.5848L398.189 80.0226C398.183 80.031 389.874 90.9895 377.468 90.9895C363.048 90.9895 356.977 79.3111 356.977 73.269H411.075C413.917 50.1328 398.775 30.3656 376.571 30.3656ZM357.02 61.0967C357.145 59.7487 359.023 43.3761 376.442 43.3761C393.861 43.3761 395.978 59.7464 396.099 61.0967H357.02Z" fill="currentColor" />
-                    </svg>
-
-                    {{-- 13 --}}
-                    <svg class="w-[438px] max-w-none relative -mt-[6.6rem] -ml-8 lg:ml-0 [--stroke-color:#1B1B18] dark:[--stroke-color:#FF750F]" viewBox="0 0 440 392" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <g class="mix-blend-darken dark:mix-blend-normal transition-all delay-300 opacity-100 duration-750 starting:opacity-0 text-[#1B1B18] dark:text-black">
-                            <mask id="path-1-mask" maskUnits="userSpaceOnUse" x="-0.328613" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="-0.328613" y="103" width="338" height="299"/>
-                                <path d="M234.936 400.8C204.136 400.8 178.936 392.4 159.336 375.6C140.136 358.8 130.536 337 130.536 310.2H200.736C200.736 318.2 203.736 324.8 209.736 330C215.736 335.2 223.736 337.8 233.736 337.8C243.336 337.8 251.136 335 257.136 329.4C263.536 323.8 266.736 316.6 266.736 307.8C266.736 299.8 263.936 293.2 258.336 288C252.736 282.8 245.536 280.2 236.736 280.2H199.536V218.4H236.736C243.536 218.4 249.336 216 254.136 211.2C258.936 206.4 261.336 200.4 261.336 193.2C261.336 184.8 258.736 178.2 253.536 173.4C248.336 168.6 241.736 166.2 233.736 166.2C226.536 166.2 220.336 168.4 215.136 172.8C210.336 177.2 207.936 182.8 207.936 189.6H141.336C141.336 164.8 150.136 144.6 167.736 129C185.336 113 207.936 105 235.536 105C263.136 105 285.536 112.2 302.736 126.6C320.336 141 329.136 160 329.136 183.6C329.136 200.8 324.536 214.8 315.336 225.6C306.136 236 294.336 243.2 279.936 247.2C297.136 252 310.736 260.2 320.736 271.8C331.136 283.4 336.336 298 336.336 315.6C336.336 340.4 326.936 360.8 308.136 376.8C289.336 392.8 264.936 400.8 234.936 400.8Z"/>
-                                <path d="M26.8714 167.6H1.67139V105.2H94.6714V400.2H26.8714V167.6Z"/>
-                            </mask>
-                            <path d="M234.936 400.8C204.136 400.8 178.936 392.4 159.336 375.6C140.136 358.8 130.536 337 130.536 310.2H200.736C200.736 318.2 203.736 324.8 209.736 330C215.736 335.2 223.736 337.8 233.736 337.8C243.336 337.8 251.136 335 257.136 329.4C263.536 323.8 266.736 316.6 266.736 307.8C266.736 299.8 263.936 293.2 258.336 288C252.736 282.8 245.536 280.2 236.736 280.2H199.536V218.4H236.736C243.536 218.4 249.336 216 254.136 211.2C258.936 206.4 261.336 200.4 261.336 193.2C261.336 184.8 258.736 178.2 253.536 173.4C248.336 168.6 241.736 166.2 233.736 166.2C226.536 166.2 220.336 168.4 215.136 172.8C210.336 177.2 207.936 182.8 207.936 189.6H141.336C141.336 164.8 150.136 144.6 167.736 129C185.336 113 207.936 105 235.536 105C263.136 105 285.536 112.2 302.736 126.6C320.336 141 329.136 160 329.136 183.6C329.136 200.8 324.536 214.8 315.336 225.6C306.136 236 294.336 243.2 279.936 247.2C297.136 252 310.736 260.2 320.736 271.8C331.136 283.4 336.336 298 336.336 315.6C336.336 340.4 326.936 360.8 308.136 376.8C289.336 392.8 264.936 400.8 234.936 400.8Z" fill="currentColor"/>
-                            <path d="M26.8714 167.6H1.67139V105.2H94.6714V400.2H26.8714V167.6Z" fill="currentColor"/>
-                            <path d="M234.936 400.8C204.136 400.8 178.936 392.4 159.336 375.6C140.136 358.8 130.536 337 130.536 310.2H200.736C200.736 318.2 203.736 324.8 209.736 330C215.736 335.2 223.736 337.8 233.736 337.8C243.336 337.8 251.136 335 257.136 329.4C263.536 323.8 266.736 316.6 266.736 307.8C266.736 299.8 263.936 293.2 258.336 288C252.736 282.8 245.536 280.2 236.736 280.2H199.536V218.4H236.736C243.536 218.4 249.336 216 254.136 211.2C258.936 206.4 261.336 200.4 261.336 193.2C261.336 184.8 258.736 178.2 253.536 173.4C248.336 168.6 241.736 166.2 233.736 166.2C226.536 166.2 220.336 168.4 215.136 172.8C210.336 177.2 207.936 182.8 207.936 189.6H141.336C141.336 164.8 150.136 144.6 167.736 129C185.336 113 207.936 105 235.536 105C263.136 105 285.536 112.2 302.736 126.6C320.336 141 329.136 160 329.136 183.6C329.136 200.8 324.536 214.8 315.336 225.6C306.136 236 294.336 243.2 279.936 247.2C297.136 252 310.736 260.2 320.736 271.8C331.136 283.4 336.336 298 336.336 315.6C336.336 340.4 326.936 360.8 308.136 376.8C289.336 392.8 264.936 400.8 234.936 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-1-mask)"/>
-                            <path d="M26.8714 167.6H1.67139V105.2H94.6714V400.2H26.8714V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-1-mask)"/>
-                        </g>
-
-                        <g class="transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[26px] text-[#F3BEC7] dark:text-[#4B0600]">
-                            <mask id="path-2-mask" maskUnits="userSpaceOnUse" x="25.3357" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="25.3357" y="103" width="338" height="299"/>
-                                <path d="M260.6 400.8C229.8 400.8 204.6 392.4 185 375.6C165.8 358.8 156.2 337 156.2 310.2H226.4C226.4 318.2 229.4 324.8 235.4 330C241.4 335.2 249.4 337.8 259.4 337.8C269 337.8 276.8 335 282.8 329.4C289.2 323.8 292.4 316.6 292.4 307.8C292.4 299.8 289.6 293.2 284 288C278.4 282.8 271.2 280.2 262.4 280.2H225.2V218.4H262.4C269.2 218.4 275 216 279.8 211.2C284.6 206.4 287 200.4 287 193.2C287 184.8 284.4 178.2 279.2 173.4C274 168.6 267.4 166.2 259.4 166.2C252.2 166.2 246 168.4 240.8 172.8C236 177.2 233.6 182.8 233.6 189.6H167C167 164.8 175.8 144.6 193.4 129C211 113 233.6 105 261.2 105C288.8 105 311.2 112.2 328.4 126.6C346 141 354.8 160 354.8 183.6C354.8 200.8 350.2 214.8 341 225.6C331.8 236 320 243.2 305.6 247.2C322.8 252 336.4 260.2 346.4 271.8C356.8 283.4 362 298 362 315.6C362 340.4 352.6 360.8 333.8 376.8C315 392.8 290.6 400.8 260.6 400.8Z"/>
-                                <path d="M52.5357 167.6H27.3357V105.2H120.336V400.2H52.5357V167.6Z"/>
-                            </mask>
-                            <path d="M260.6 400.8C229.8 400.8 204.6 392.4 185 375.6C165.8 358.8 156.2 337 156.2 310.2H226.4C226.4 318.2 229.4 324.8 235.4 330C241.4 335.2 249.4 337.8 259.4 337.8C269 337.8 276.8 335 282.8 329.4C289.2 323.8 292.4 316.6 292.4 307.8C292.4 299.8 289.6 293.2 284 288C278.4 282.8 271.2 280.2 262.4 280.2H225.2V218.4H262.4C269.2 218.4 275 216 279.8 211.2C284.6 206.4 287 200.4 287 193.2C287 184.8 284.4 178.2 279.2 173.4C274 168.6 267.4 166.2 259.4 166.2C252.2 166.2 246 168.4 240.8 172.8C236 177.2 233.6 182.8 233.6 189.6H167C167 164.8 175.8 144.6 193.4 129C211 113 233.6 105 261.2 105C288.8 105 311.2 112.2 328.4 126.6C346 141 354.8 160 354.8 183.6C354.8 200.8 350.2 214.8 341 225.6C331.8 236 320 243.2 305.6 247.2C322.8 252 336.4 260.2 346.4 271.8C356.8 283.4 362 298 362 315.6C362 340.4 352.6 360.8 333.8 376.8C315 392.8 290.6 400.8 260.6 400.8Z" fill="currentColor"/>
-                            <path d="M52.5357 167.6H27.3357V105.2H120.336V400.2H52.5357V167.6Z" fill="currentColor"/>
-                            <path d="M260.6 400.8C229.8 400.8 204.6 392.4 185 375.6C165.8 358.8 156.2 337 156.2 310.2H226.4C226.4 318.2 229.4 324.8 235.4 330C241.4 335.2 249.4 337.8 259.4 337.8C269 337.8 276.8 335 282.8 329.4C289.2 323.8 292.4 316.6 292.4 307.8C292.4 299.8 289.6 293.2 284 288C278.4 282.8 271.2 280.2 262.4 280.2H225.2V218.4H262.4C269.2 218.4 275 216 279.8 211.2C284.6 206.4 287 200.4 287 193.2C287 184.8 284.4 178.2 279.2 173.4C274 168.6 267.4 166.2 259.4 166.2C252.2 166.2 246 168.4 240.8 172.8C236 177.2 233.6 182.8 233.6 189.6H167C167 164.8 175.8 144.6 193.4 129C211 113 233.6 105 261.2 105C288.8 105 311.2 112.2 328.4 126.6C346 141 354.8 160 354.8 183.6C354.8 200.8 350.2 214.8 341 225.6C331.8 236 320 243.2 305.6 247.2C322.8 252 336.4 260.2 346.4 271.8C356.8 283.4 362 298 362 315.6C362 340.4 352.6 360.8 333.8 376.8C315 392.8 290.6 400.8 260.6 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-2-mask)"/>
-                            <path d="M52.5357 167.6H27.3357V105.2H120.336V400.2H52.5357V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-2-mask)"/>
-                        </g>
-                        
-                        <g class="mix-blend-color dark:mix-blend-hard-light transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[51px] text-[#F8B803] dark:text-[#391800]">
-                            <mask id="path-3-mask" maskUnits="userSpaceOnUse" x="51" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="51" y="103" width="338" height="299"/>
-                                <path d="M286.264 400.8C255.464 400.8 230.264 392.4 210.664 375.6C191.464 358.8 181.864 337 181.864 310.2H252.064C252.064 318.2 255.064 324.8 261.064 330C267.064 335.2 275.064 337.8 285.064 337.8C294.664 337.8 302.464 335 308.464 329.4C314.864 323.8 318.064 316.6 318.064 307.8C318.064 299.8 315.264 293.2 309.664 288C304.064 282.8 296.864 280.2 288.064 280.2H250.864V218.4H288.064C294.864 218.4 300.664 216 305.464 211.2C310.264 206.4 312.664 200.4 312.664 193.2C312.664 184.8 310.064 178.2 304.864 173.4C299.664 168.6 293.064 166.2 285.064 166.2C277.864 166.2 271.664 168.4 266.464 172.8C261.664 177.2 259.264 182.8 259.264 189.6H192.664C192.664 164.8 201.464 144.6 219.064 129C236.664 113 259.264 105 286.864 105C314.464 105 336.864 112.2 354.064 126.6C371.664 141 380.464 160 380.464 183.6C380.464 200.8 375.864 214.8 366.664 225.6C357.464 236 345.664 243.2 331.264 247.2C348.464 252 362.064 260.2 372.064 271.8C382.464 283.4 387.664 298 387.664 315.6C387.664 340.4 378.264 360.8 359.464 376.8C340.664 392.8 316.264 400.8 286.264 400.8Z"/>
-                                <path d="M78.2 167.6H53V105.2H146V400.2H78.2V167.6Z"/>
-                            </mask>
-                            <path d="M286.264 400.8C255.464 400.8 230.264 392.4 210.664 375.6C191.464 358.8 181.864 337 181.864 310.2H252.064C252.064 318.2 255.064 324.8 261.064 330C267.064 335.2 275.064 337.8 285.064 337.8C294.664 337.8 302.464 335 308.464 329.4C314.864 323.8 318.064 316.6 318.064 307.8C318.064 299.8 315.264 293.2 309.664 288C304.064 282.8 296.864 280.2 288.064 280.2H250.864V218.4H288.064C294.864 218.4 300.664 216 305.464 211.2C310.264 206.4 312.664 200.4 312.664 193.2C312.664 184.8 310.064 178.2 304.864 173.4C299.664 168.6 293.064 166.2 285.064 166.2C277.864 166.2 271.664 168.4 266.464 172.8C261.664 177.2 259.264 182.8 259.264 189.6H192.664C192.664 164.8 201.464 144.6 219.064 129C236.664 113 259.264 105 286.864 105C314.464 105 336.864 112.2 354.064 126.6C371.664 141 380.464 160 380.464 183.6C380.464 200.8 375.864 214.8 366.664 225.6C357.464 236 345.664 243.2 331.264 247.2C348.464 252 362.064 260.2 372.064 271.8C382.464 283.4 387.664 298 387.664 315.6C387.664 340.4 378.264 360.8 359.464 376.8C340.664 392.8 316.264 400.8 286.264 400.8Z" fill="currentColor"/>
-                            <path d="M78.2 167.6H53V105.2H146V400.2H78.2V167.6Z" fill="currentColor"/>
-                            <path d="M286.264 400.8C255.464 400.8 230.264 392.4 210.664 375.6C191.464 358.8 181.864 337 181.864 310.2H252.064C252.064 318.2 255.064 324.8 261.064 330C267.064 335.2 275.064 337.8 285.064 337.8C294.664 337.8 302.464 335 308.464 329.4C314.864 323.8 318.064 316.6 318.064 307.8C318.064 299.8 315.264 293.2 309.664 288C304.064 282.8 296.864 280.2 288.064 280.2H250.864V218.4H288.064C294.864 218.4 300.664 216 305.464 211.2C310.264 206.4 312.664 200.4 312.664 193.2C312.664 184.8 310.064 178.2 304.864 173.4C299.664 168.6 293.064 166.2 285.064 166.2C277.864 166.2 271.664 168.4 266.464 172.8C261.664 177.2 259.264 182.8 259.264 189.6H192.664C192.664 164.8 201.464 144.6 219.064 129C236.664 113 259.264 105 286.864 105C314.464 105 336.864 112.2 354.064 126.6C371.664 141 380.464 160 380.464 183.6C380.464 200.8 375.864 214.8 366.664 225.6C357.464 236 345.664 243.2 331.264 247.2C348.464 252 362.064 260.2 372.064 271.8C382.464 283.4 387.664 298 387.664 315.6C387.664 340.4 378.264 360.8 359.464 376.8C340.664 392.8 316.264 400.8 286.264 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-3-mask)"/>
-                            <path d="M78.2 167.6H53V105.2H146V400.2H78.2V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-3-mask)"/>
-                        </g>
-                        
-                        <g class="mix-blend-multiply dark:mix-blend-normal transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[78px] text-[#F3BEC7] dark:text-[#733000]">
-                            <mask id="path-4-mask" maskUnits="userSpaceOnUse" x="76.6643" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="76.6643" y="103" width="338" height="299"/>
-                                <path d="M311.929 400.8C281.129 400.8 255.929 392.4 236.329 375.6C217.129 358.8 207.529 337 207.529 310.2H277.729C277.729 318.2 280.729 324.8 286.729 330C292.729 335.2 300.729 337.8 310.729 337.8C320.329 337.8 328.129 335 334.129 329.4C340.529 323.8 343.729 316.6 343.729 307.8C343.729 299.8 340.929 293.2 335.329 288C329.729 282.8 322.529 280.2 313.729 280.2H276.529V218.4H313.729C320.529 218.4 326.329 216 331.129 211.2C335.929 206.4 338.329 200.4 338.329 193.2C338.329 184.8 335.729 178.2 330.529 173.4C325.329 168.6 318.729 166.2 310.729 166.2C303.529 166.2 297.329 168.4 292.129 172.8C287.329 177.2 284.929 182.8 284.929 189.6H218.329C218.329 164.8 227.129 144.6 244.729 129C262.329 113 284.929 105 312.529 105C340.129 105 362.529 112.2 379.729 126.6C397.329 141 406.129 160 406.129 183.6C406.129 200.8 401.529 214.8 392.329 225.6C383.129 236 371.329 243.2 356.929 247.2C374.129 252 387.729 260.2 397.729 271.8C408.129 283.4 413.329 298 413.329 315.6C413.329 340.4 403.929 360.8 385.129 376.8C366.329 392.8 341.929 400.8 311.929 400.8Z"/>
-                                <path d="M103.864 167.6H78.6643V105.2H171.664V400.2H103.864V167.6Z"/>
-                            </mask>
-                            <path d="M311.929 400.8C281.129 400.8 255.929 392.4 236.329 375.6C217.129 358.8 207.529 337 207.529 310.2H277.729C277.729 318.2 280.729 324.8 286.729 330C292.729 335.2 300.729 337.8 310.729 337.8C320.329 337.8 328.129 335 334.129 329.4C340.529 323.8 343.729 316.6 343.729 307.8C343.729 299.8 340.929 293.2 335.329 288C329.729 282.8 322.529 280.2 313.729 280.2H276.529V218.4H313.729C320.529 218.4 326.329 216 331.129 211.2C335.929 206.4 338.329 200.4 338.329 193.2C338.329 184.8 335.729 178.2 330.529 173.4C325.329 168.6 318.729 166.2 310.729 166.2C303.529 166.2 297.329 168.4 292.129 172.8C287.329 177.2 284.929 182.8 284.929 189.6H218.329C218.329 164.8 227.129 144.6 244.729 129C262.329 113 284.929 105 312.529 105C340.129 105 362.529 112.2 379.729 126.6C397.329 141 406.129 160 406.129 183.6C406.129 200.8 401.529 214.8 392.329 225.6C383.129 236 371.329 243.2 356.929 247.2C374.129 252 387.729 260.2 397.729 271.8C408.129 283.4 413.329 298 413.329 315.6C413.329 340.4 403.929 360.8 385.129 376.8C366.329 392.8 341.929 400.8 311.929 400.8Z" fill="currentColor"/>
-                            <path d="M103.864 167.6H78.6643V105.2H171.664V400.2H103.864V167.6Z" fill="currentColor"/>
-                            <path d="M311.929 400.8C281.129 400.8 255.929 392.4 236.329 375.6C217.129 358.8 207.529 337 207.529 310.2H277.729C277.729 318.2 280.729 324.8 286.729 330C292.729 335.2 300.729 337.8 310.729 337.8C320.329 337.8 328.129 335 334.129 329.4C340.529 323.8 343.729 316.6 343.729 307.8C343.729 299.8 340.929 293.2 335.329 288C329.729 282.8 322.529 280.2 313.729 280.2H276.529V218.4H313.729C320.529 218.4 326.329 216 331.129 211.2C335.929 206.4 338.329 200.4 338.329 193.2C338.329 184.8 335.729 178.2 330.529 173.4C325.329 168.6 318.729 166.2 310.729 166.2C303.529 166.2 297.329 168.4 292.129 172.8C287.329 177.2 284.929 182.8 284.929 189.6H218.329C218.329 164.8 227.129 144.6 244.729 129C262.329 113 284.929 105 312.529 105C340.129 105 362.529 112.2 379.729 126.6C397.329 141 406.129 160 406.129 183.6C406.129 200.8 401.529 214.8 392.329 225.6C383.129 236 371.329 243.2 356.929 247.2C374.129 252 387.729 260.2 397.729 271.8C408.129 283.4 413.329 298 413.329 315.6C413.329 340.4 403.929 360.8 385.129 376.8C366.329 392.8 341.929 400.8 311.929 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-4-mask)"/>
-                            <path d="M103.864 167.6H78.6643V105.2H171.664V400.2H103.864V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-4-mask)"/>
-                        </g>
-                        
-                        <g class="mix-blend-hard-light transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[102px] text-[#F3BEC7] dark:text-[#4B0600]">
-                            <mask id="path-5-mask" maskUnits="userSpaceOnUse" x="102.329" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="102.329" y="103" width="338" height="299"/>
-                                <path d="M337.593 400.8C306.793 400.8 281.593 392.4 261.993 375.6C242.793 358.8 233.193 337 233.193 310.2H303.393C303.393 318.2 306.393 324.8 312.393 330C318.393 335.2 326.393 337.8 336.393 337.8C345.993 337.8 353.793 335 359.793 329.4C366.193 323.8 369.393 316.6 369.393 307.8C369.393 299.8 366.593 293.2 360.993 288C355.393 282.8 348.193 280.2 339.393 280.2H302.193V218.4H339.393C346.193 218.4 351.993 216 356.793 211.2C361.593 206.4 363.993 200.4 363.993 193.2C363.993 184.8 361.393 178.2 356.193 173.4C350.993 168.6 344.393 166.2 336.393 166.2C329.193 166.2 322.993 168.4 317.793 172.8C312.993 177.2 310.593 182.8 310.593 189.6H243.993C243.993 164.8 252.793 144.6 270.393 129C287.993 113 310.593 105 338.193 105C365.793 105 388.193 112.2 405.393 126.6C422.993 141 431.793 160 431.793 183.6C431.793 200.8 427.193 214.8 417.993 225.6C408.793 236 396.993 243.2 382.593 247.2C399.793 252 413.393 260.2 423.393 271.8C433.793 283.4 438.993 298 438.993 315.6C438.993 340.4 429.593 360.8 410.793 376.8C391.993 392.8 367.593 400.8 337.593 400.8Z"/>
-                                <path d="M129.529 167.6H104.329V105.2H197.329V400.2H129.529V167.6Z"/>
-                            </mask>
-                            <path d="M337.593 400.8C306.793 400.8 281.593 392.4 261.993 375.6C242.793 358.8 233.193 337 233.193 310.2H303.393C303.393 318.2 306.393 324.8 312.393 330C318.393 335.2 326.393 337.8 336.393 337.8C345.993 337.8 353.793 335 359.793 329.4C366.193 323.8 369.393 316.6 369.393 307.8C369.393 299.8 366.593 293.2 360.993 288C355.393 282.8 348.193 280.2 339.393 280.2H302.193V218.4H339.393C346.193 218.4 351.993 216 356.793 211.2C361.593 206.4 363.993 200.4 363.993 193.2C363.993 184.8 361.393 178.2 356.193 173.4C350.993 168.6 344.393 166.2 336.393 166.2C329.193 166.2 322.993 168.4 317.793 172.8C312.993 177.2 310.593 182.8 310.593 189.6H243.993C243.993 164.8 252.793 144.6 270.393 129C287.993 113 310.593 105 338.193 105C365.793 105 388.193 112.2 405.393 126.6C422.993 141 431.793 160 431.793 183.6C431.793 200.8 427.193 214.8 417.993 225.6C408.793 236 396.993 243.2 382.593 247.2C399.793 252 413.393 260.2 423.393 271.8C433.793 283.4 438.993 298 438.993 315.6C438.993 340.4 429.593 360.8 410.793 376.8C391.993 392.8 367.593 400.8 337.593 400.8Z" fill="currentColor"/>
-                            <path d="M129.529 167.6H104.329V105.2H197.329V400.2H129.529V167.6Z" fill="currentColor"/>
-                            <path d="M337.593 400.8C306.793 400.8 281.593 392.4 261.993 375.6C242.793 358.8 233.193 337 233.193 310.2H303.393C303.393 318.2 306.393 324.8 312.393 330C318.393 335.2 326.393 337.8 336.393 337.8C345.993 337.8 353.793 335 359.793 329.4C366.193 323.8 369.393 316.6 369.393 307.8C369.393 299.8 366.593 293.2 360.993 288C355.393 282.8 348.193 280.2 339.393 280.2H302.193V218.4H339.393C346.193 218.4 351.993 216 356.793 211.2C361.593 206.4 363.993 200.4 363.993 193.2C363.993 184.8 361.393 178.2 356.193 173.4C350.993 168.6 344.393 166.2 336.393 166.2C329.193 166.2 322.993 168.4 317.793 172.8C312.993 177.2 310.593 182.8 310.593 189.6H243.993C243.993 164.8 252.793 144.6 270.393 129C287.993 113 310.593 105 338.193 105C365.793 105 388.193 112.2 405.393 126.6C422.993 141 431.793 160 431.793 183.6C431.793 200.8 427.193 214.8 417.993 225.6C408.793 236 396.993 243.2 382.593 247.2C399.793 252 413.393 260.2 423.393 271.8C433.793 283.4 438.993 298 438.993 315.6C438.993 340.4 429.593 360.8 410.793 376.8C391.993 392.8 367.593 400.8 337.593 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-5-mask)"/>
-                            <path d="M129.529 167.6H104.329V105.2H197.329V400.2H129.529V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-5-mask)"/>
-                        </g>
-                    </svg>
-                    <div class="absolute inset-0 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg shadow-[inset_0px_0px_0px_1px_rgba(26,26,0,0.16)] dark:shadow-[inset_0px_0px_0px_1px_#fffaed2d]"></div>
-                </div>
-            </main>
+        <!-- Barra de Progresso de Sincronização em Segundo Plano -->
+        <div x-show="isSyncing" x-cloak class="bg-blue-600 text-white p-3 text-xs shadow-md transition">
+            <div class="flex justify-between items-center mb-1 font-bold">
+                <span x-text="syncStatusText">Sincronizando dados pendentes...</span>
+                <span x-text="syncProgress + '%'">0%</span>
+            </div>
+            <div class="w-full bg-blue-900 rounded-full h-2 overflow-hidden">
+                <div class="bg-emerald-400 h-2 transition-all duration-300" :style="`width: ${syncProgress}%`"></div>
+            </div>
         </div>
 
-        @if (Route::has('login'))
-            <div class="h-14.5 hidden lg:block"></div>
-        @endif
-    </body>
+        <!-- Alerta de Modo Offline Ativo -->
+        <div x-show="!isOnline" x-cloak class="bg-amber-500 text-white text-xs px-4 py-1.5 font-bold text-center flex items-center justify-center gap-1.5 shadow-sm">
+            <span>⚠️</span> Modo Offline Ativo. As OSs e fotos serão salvas localmente no aparelho.
+        </div>
+
+        <!-- Mensagem de Sucesso / Rascunho Encontrado -->
+        <div x-show="successMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs rounded-lg flex items-center gap-2 shadow-sm font-medium">
+            <span class="text-base">✓</span>
+            <span x-text="successMessage" class="flex-1"></span>
+        </div>
+
+        <!-- Notificações de Erro / Bloqueio -->
+        <div x-show="errorMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-red-100 border border-red-400 text-red-700 text-sm rounded-lg flex items-start gap-2 shadow-sm">
+            <span class="font-bold text-red-600">!</span>
+            <div class="flex-1 text-xs leading-relaxed">
+                <span x-text="errorMessage"></span>
+                <div x-show="isFinalized" class="mt-2">
+                    <button type="button" @click="reopenReport" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold transition shadow-sm">
+                        Reabrir Ordem de Serviço
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conteúdo Principal -->
+        <main class="p-5 flex-1">
+
+            <!-- ETAPA 1: Dados da OS -->
+            <section x-show="step === 1" x-cloak class="space-y-4">
+                <div class="border-b border-gray-200 pb-3 mb-4">
+                    <h2 class="text-base font-bold text-gray-900">Identificação do Serviço</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Digite o número da OS para buscar ou iniciar novo chamado.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Número da OS *</label>
+                    <input
+                        type="text"
+                        x-model="osNumber"
+                        @input="onOsInput"
+                        placeholder="Ex: 3456789 ou OS-2026-01"
+                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                </div>
+
+                <!-- CAMPO UNIDADE COM AUTOCOMPLETE INTELIGENTE -->
+                <div class="relative" @click.outside="showUnitDropdown = false">
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        Unidade *
+                    </label>
+                    <input
+                        type="text"
+                        x-model="unit"
+                        @focus="showUnitDropdown = true; filterUnits()"
+                        @input="showUnitDropdown = true"
+                        placeholder="Digite para buscar ou cadastrar..."
+                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                        :disabled="isFinalized"
+                    >
+
+                    <!-- Dropdown Flutuante de Unidades -->
+                    <div
+                        x-show="showUnitDropdown && unitSuggestions.length > 0"
+                        x-cloak
+                        class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        <template x-for="item in unitSuggestions" :key="item.id">
+                            <button
+                                type="button"
+                                @click="selectUnit(item)"
+                                class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
+                                <span x-text="item.name"></span>
+                                <span class="text-[10px] text-gray-400">Existente</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- CAMPO SETORES COM TAGS E AUTOCOMPLETE HIERÁRQUICO -->
+                <div class="relative" @click.outside="showSectorDropdown = false">
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        Setores Vinculados *
+                    </label>
+
+                    <!-- Lista de Setores Selecionados (Tags) -->
+                    <div class="flex flex-wrap gap-1.5 mb-2" x-show="sectors.length > 0">
+                        <template x-for="(s, index) in sectors" :key="index">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-md">
+                                <span x-text="s"></span>
+                                <button type="button" @click="removeSector(index)" class="text-blue-500 hover:text-blue-800 font-bold">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <input
+                            type="text"
+                            x-model="sectorInput"
+                            @focus="showSectorDropdown = true; filterSectors()"
+                            @input="showSectorDropdown = true"
+                            @keydown.enter.prevent="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
+                            placeholder="Digite o setor e selecione ou aperte Enter..."
+                            class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                            :disabled="isFinalized"
+                        >
+                        <button
+                            type="button"
+                            @click="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
+                            class="px-4 py-2.5 bg-gray-800 hover:bg-black text-white rounded-lg text-xs font-bold transition">
+                            Adicionar
+                        </button>
+                    </div>
+
+                    <!-- Dropdown Flutuante de Setores -->
+                    <div
+                        x-show="showSectorDropdown && sectorSuggestions.length > 0"
+                        x-cloak
+                        class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        <template x-for="item in sectorSuggestions" :key="item.id">
+                            <button
+                                type="button"
+                                @click="addSector(item.name); sectorInput = ''; showSectorDropdown = false;"
+                                class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
+                                <span x-text="item.name"></span>
+                                <span class="text-[10px] text-gray-400">Setor da Unidade</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Técnicos Envolvidos</label>
+                    <input type="text" x-model="technicians" placeholder="Ex: Bruno Soares, Jonas" class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Descrição / Histórico</label>
+                    <textarea x-model="history" rows="3" placeholder="Resumo das atividades desenvolvidas..." class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"></textarea>
+                </div>
+
+                <div class="pt-3">
+                    <button
+                        type="button"
+                        @click="startReport"
+                        :disabled="loading || isFinalized"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold text-sm shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2">
+                        <span x-show="!loading">Avançar para Fotos &rarr;</span>
+                        <span x-show="loading" class="animate-pulse">Gravando Dados...</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ETAPA 2: Registro Fotográfico -->
+            <section x-show="step === 2" x-cloak class="space-y-4">
+                <div class="border-b border-gray-200 pb-3 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-gray-900">Evidências Fotográficas</h2>
+                        <p class="text-xs text-slate-500">Capture as fotos e adicione as observações técnicas.</p>
+                    </div>
+                    <span class="text-xs font-mono font-bold bg-gray-200 text-gray-800 border border-gray-300 px-2.5 py-1 rounded" x-text="'OS: ' + osNumber"></span>
+                </div>
+
+                <input type="file" x-ref="cameraInput" @change="handlePhotoCapture" accept="image/*" capture="environment" class="hidden">
+
+                <button type="button" @click="triggerCamera" :disabled="loading" class="w-full py-5 rounded-xl font-bold flex flex-col items-center justify-center gap-1.5 transition disabled:opacity-50 btn-camera shadow-sm">
+                    <span class="text-2xl">📸</span>
+                    <span x-show="!loading" class="text-sm font-bold">Tirar Foto com Câmera</span>
+                    <span x-show="loading" class="text-xs animate-pulse">Comprimindo e Gravando...</span>
+                </button>
+
+                <div class="space-y-4 mt-4">
+                    <template x-for="(photo, index) in photos" :key="photo.id">
+                        <div class="p-3.5 bg-white border border-gray-300 rounded-xl shadow-sm flex flex-col gap-3">
+                            <div class="relative w-full rounded-lg overflow-hidden border border-gray-200" style="min-height: 240px; height: 260px; background-color: #111827;">
+                                <img :src="photo.url" class="w-full h-full object-cover block" alt="Evidência Fotográfica">
+
+                                <div class="absolute top-2 right-2 flex gap-1 rounded-md p-1 z-20" style="background-color: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.2);">
+                                    <button
+                                        type="button"
+                                        @click="movePhoto(index, -1)"
+                                        :disabled="index === 0"
+                                        class="w-8 h-8 flex items-center justify-center text-sm font-bold text-white rounded hover:bg-white/20 disabled:opacity-20 transition"
+                                        title="Mover para cima">
+                                        ▲
+                                    </button>
+                                    <button
+                                        type="button"
+                                        @click="movePhoto(index, 1)"
+                                        :disabled="index === photos.length - 1"
+                                        class="w-8 h-8 flex items-center justify-center text-sm font-bold text-white rounded hover:bg-white/20 disabled:opacity-20 transition"
+                                        title="Mover para baixo">
+                                        ▼
+                                    </button>
+                                </div>
+
+                                <div class="absolute bottom-2 left-2 text-white text-xs font-mono font-semibold px-2.5 py-1 rounded z-20" style="background-color: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.2);">
+                                    Foto #<span x-text="index + 1"></span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">
+                                    Observação da Foto #<span x-text="index + 1"></span>:
+                                </label>
+                                <input
+                                    type="text"
+                                    x-model="photo.observation"
+                                    @change="updatePhotoObservation(photo.id, photo.observation)"
+                                    placeholder="Ex: Disjuntor identificado / Quadro energizado"
+                                    class="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div x-show="photos.length === 0" x-cloak class="text-center py-8 text-gray-400 text-xs">
+                    Nenhuma foto capturada nesta OS.
+                </div>
+
+                <div class="pt-4 border-t border-gray-200 space-y-2">
+                    <button
+                        type="button"
+                        @click="finalize"
+                        :disabled="loading || photos.length === 0"
+                        class="w-full py-3.5 px-4 rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                        :class="photos.length > 0 && !loading ? 'btn-finalize-active' : 'btn-finalize-disabled'">
+                        <span x-show="!loading">Finalizar Relatório e Gerar PDF</span>
+                        <span x-show="loading" x-cloak class="animate-pulse flex items-center gap-1.5 text-white">
+                            <span>⏳</span> Compilando Documento...
+                        </span>
+                    </button>
+
+                    <button type="button" @click="step = 1" class="w-full py-2 text-xs font-medium text-gray-500 hover:text-gray-900 text-center block transition">
+                        &larr; Voltar para os dados da OS
+                    </button>
+                </div>
+            </section>
+
+            <!-- ETAPA 3: Conclusão -->
+            <section x-show="step === 3" x-cloak class="space-y-6 text-center py-4">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl font-bold border border-emerald-300 shadow-sm">
+                    ✓
+                </div>
+
+                <div class="space-y-1">
+                    <h2 class="text-lg font-bold text-gray-900">Relatório Concluído!</h2>
+                    <p class="text-xs text-gray-500">
+                        A Ordem de Serviço <strong class="text-gray-800" x-text="osNumber"></strong> foi finalizada e o PDF gerado.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5">
+                    <button
+                        type="button"
+                        @click="shareWhatsapp"
+                        class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                        <span>💬</span> Compartilhar no WhatsApp
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="shareReport"
+                        class="w-full py-2.5 px-4 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2">
+                        <span>📲</span> Outras Formas de Envio
+                    </button>
+
+                    <a
+                        :href="pdfUrl"
+                        target="_blank"
+                        class="w-full py-2.5 px-4 bg-gray-800 hover:bg-black text-white rounded-lg font-semibold text-xs transition block text-center shadow-sm">
+                        Visualizar PDF no Navegador
+                    </a>
+                </div>
+
+                <div class="pt-2 border-t border-gray-200">
+                    <button
+                        type="button"
+                        @click="resetFlow"
+                        class="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
+                        <span>＋</span> Iniciar Novo Relatório
+                    </button>
+                    <p class="text-[11px] text-gray-400 mt-2">Os campos serão limpos para uma nova ordem de serviço.</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW ativo:', reg.scope))
+                    .catch(err => console.error('Erro SW:', err));
+            });
+        }
+    </script>
+</body>
 </html>
 
 
@@ -9694,6 +10105,7 @@ ARQUIVO: C:\Projetos\reports\foto-os\resources\views\pwa\index.blade.php
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#111827">
@@ -9839,14 +10251,14 @@ ARQUIVO: C:\Projetos\reports\foto-os\resources\views\pwa\index.blade.php
                             x-model="sectorInput"
                             @focus="showSectorDropdown = true; filterSectors()"
                             @input="showSectorDropdown = true"
-                            @keydown.enter.prevent="addSector()"
+                            @keydown.enter.prevent="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
                             placeholder="Digite o setor e selecione ou aperte Enter..."
-                            class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
-                            :disabled="isFinalized"
-                        >
+                         class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                        :disabled="isFinalized"
+                    >
                         <button
                             type="button"
-                            @click="addSector()"
+                            @click="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
                             class="px-4 py-2.5 bg-gray-800 hover:bg-black text-white rounded-lg text-xs font-bold transition">
                             Adicionar
                         </button>
@@ -9856,18 +10268,18 @@ ARQUIVO: C:\Projetos\reports\foto-os\resources\views\pwa\index.blade.php
                     <div
                         x-show="showSectorDropdown && sectorSuggestions.length > 0"
                         x-cloak
-                        class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                     class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
                         <template x-for="item in sectorSuggestions" :key="item.id">
                             <button
                                 type="button"
-                                @click="addSector(item.name)"
+                                @click="addSector(item.name); sectorInput = ''; showSectorDropdown = false;"
                                 class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
                                 <span x-text="item.name"></span>
                                 <span class="text-[10px] text-gray-400">Setor da Unidade</span>
                             </button>
                         </template>
                     </div>
-                </div>
+               </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Técnicos Envolvidos</label>
@@ -10125,6 +10537,361 @@ Route::middleware('auth')->prefix('painel')->group(function () {
     Route::post('/relatorios/{report}/adiar-expurgo', [DashboardController::class, 'postponePurge'])->name('admin.retention.postpone');
 });
 
+
+
+========================================
+ARQUIVO: C:\Projetos\reports\foto-os\storage\framework\views\b566630cd9dd07f520dc6ac669bb18e2.php
+========================================
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#111827">
+    <title>FotoOS - Relatórios em Campo</title>
+
+    <link rel="manifest" href="/manifest.json">
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .btn-camera {
+            border: 2px dashed #059669;
+            background-color: #ecfdf5;
+            color: #065f46;
+        }
+        .btn-camera:hover {
+            background-color: #d1fae5;
+        }
+        .btn-finalize-active {
+            background-color: #111827 !important;
+            color: #ffffff !important;
+            cursor: pointer;
+        }
+        .btn-finalize-disabled {
+            background-color: #e5e7eb !important;
+            color: #9ca3af !important;
+            border: 1px solid #d1d5db !important;
+            cursor: not-allowed;
+        }
+    </style>
+
+    <script src="/js/report-flow.js?v=<?php echo e(time()); ?>"></script>
+    <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css', 'resources/js/app.js']); ?>
+</head>
+<body class="bg-gray-100 text-gray-800 antialiased min-h-screen">
+
+    <div x-data="reportFlow" class="max-w-lg mx-auto min-h-screen bg-white shadow-xl flex flex-col justify-between">
+
+        <!-- Topo / Barra de Status -->
+        <header class="bg-gray-800 text-white px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 border-b border-gray-700" style="background-color: #111827;">
+            <div>
+                <h1 class="text-base font-bold tracking-wide text-white">FotoOS</h1>
+                <p class="text-[11px] text-gray-400">Manserv Facilities</p>
+            </div>
+            <div class="flex items-center">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm"
+                      :class="step === 3 ? 'bg-emerald-600' : 'bg-blue-600'"
+                      x-text="step === 1 ? 'Etapa 1 de 2' : (step === 2 ? 'Etapa 2 de 2' : 'Concluído')">
+                    Etapa 1 de 2
+                </span>
+            </div>
+        </header>
+
+        <!-- Mensagem de Sucesso / Rascunho Encontrado -->
+        <div x-show="successMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs rounded-lg flex items-center gap-2 shadow-sm font-medium">
+            <span class="text-base">✓</span>
+            <span x-text="successMessage" class="flex-1"></span>
+        </div>
+
+        <!-- Notificações de Erro / Bloqueio -->
+        <div x-show="errorMessage" x-cloak class="mx-4 mt-4 p-3.5 bg-red-100 border border-red-400 text-red-700 text-sm rounded-lg flex items-start gap-2 shadow-sm">
+            <span class="font-bold text-red-600">!</span>
+            <div class="flex-1 text-xs leading-relaxed">
+                <span x-text="errorMessage"></span>
+                <div x-show="isFinalized" class="mt-2">
+                    <button type="button" @click="reopenReport" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded font-bold transition shadow-sm">
+                        Reabrir Ordem de Serviço
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conteúdo Principal -->
+        <main class="p-5 flex-1">
+
+            <!-- ETAPA 1: Dados da OS -->
+            <section x-show="step === 1" x-cloak class="space-y-4">
+                <div class="border-b border-gray-200 pb-3 mb-4">
+                    <h2 class="text-base font-bold text-gray-900">Identificação do Serviço</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Digite o número da OS para buscar ou iniciar novo chamado.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Número da OS *</label>
+                    <input
+                        type="text"
+                        x-model="osNumber"
+                        @input.debounce.600ms="searchOs"
+                        placeholder="Ex: 3456789 ou OS-2026-01"
+                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                </div>
+
+                <!-- CAMPO UNIDADE COM AUTOCOMPLETE INTELIGENTE -->
+                <div class="relative" @click.outside="showUnitDropdown = false">
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        Unidade *
+                    </label>
+                    <input
+                        type="text"
+                        x-model="unit"
+                        @focus="showUnitDropdown = true; filterUnits()"
+                        @input="showUnitDropdown = true"
+                        placeholder="Digite para buscar ou cadastrar..."
+                        class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                        :disabled="isFinalized"
+                    >
+
+                    <!-- Dropdown Flutuante de Unidades -->
+                    <div
+                        x-show="showUnitDropdown && unitSuggestions.length > 0"
+                        x-cloak
+                        class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        <template x-for="item in unitSuggestions" :key="item.id">
+                            <button
+                                type="button"
+                                @click="selectUnit(item)"
+                                class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
+                                <span x-text="item.name"></span>
+                                <span class="text-[10px] text-gray-400">Existente</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- CAMPO SETORES COM TAGS E AUTOCOMPLETE HIERÁRQUICO -->
+                <div class="relative" @click.outside="showSectorDropdown = false">
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">
+                        Setores Vinculados *
+                    </label>
+
+                    <!-- Lista de Setores Selecionados (Tags) -->
+                    <div class="flex flex-wrap gap-1.5 mb-2" x-show="sectors.length > 0">
+                        <template x-for="(s, index) in sectors" :key="index">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-md">
+                                <span x-text="s"></span>
+                                <button type="button" @click="removeSector(index)" class="text-blue-500 hover:text-blue-800 font-bold">&times;</button>
+                            </span>
+                        </template>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <input
+                            type="text"
+                            x-model="sectorInput"
+                            @focus="showSectorDropdown = true; filterSectors()"
+                            @input="showSectorDropdown = true"
+                            @keydown.enter.prevent="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
+                            placeholder="Digite o setor e selecione ou aperte Enter..."
+                         class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none transition"
+                        :disabled="isFinalized"
+                    >
+                        <button
+                            type="button"
+                            @click="if(sectorInput.trim()) { addSector(sectorInput); sectorInput = ''; showSectorDropdown = false; }"
+                            class="px-4 py-2.5 bg-gray-800 hover:bg-black text-white rounded-lg text-xs font-bold transition">
+                            Adicionar
+                        </button>
+                    </div>
+
+                    <!-- Dropdown Flutuante de Setores -->
+                    <div
+                        x-show="showSectorDropdown && sectorSuggestions.length > 0"
+                        x-cloak
+                     class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto divide-y divide-gray-100">
+                        <template x-for="item in sectorSuggestions" :key="item.id">
+                            <button
+                                type="button"
+                                @click="addSector(item.name); sectorInput = ''; showSectorDropdown = false;"
+                                class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-blue-50 hover:text-blue-700 font-medium transition flex items-center justify-between">
+                                <span x-text="item.name"></span>
+                                <span class="text-[10px] text-gray-400">Setor da Unidade</span>
+                            </button>
+                        </template>
+                    </div>
+               </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Técnicos Envolvidos</label>
+                    <input type="text" x-model="technicians" placeholder="Ex: Bruno Soares, Jonas" class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1">Descrição / Histórico</label>
+                    <textarea x-model="history" rows="3" placeholder="Resumo das atividades desenvolvidas..." class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none"></textarea>
+                </div>
+
+                <div class="pt-3">
+                    <button
+                        type="button"
+                        @click="startReport"
+                        :disabled="loading || isFinalized"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold text-sm shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2">
+                        <span x-show="!loading">Avançar para Fotos &rarr;</span>
+                        <span x-show="loading" class="animate-pulse">Salvando Dados...</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- ETAPA 2: Registro Fotográfico -->
+            <section x-show="step === 2" x-cloak class="space-y-4">
+                <div class="border-b border-gray-200 pb-3 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-base font-bold text-gray-900">Evidências Fotográficas</h2>
+                        <p class="text-xs text-slate-500">Capture as fotos e adicione as observações técnicas.</p>
+                    </div>
+                    <span class="text-xs font-mono font-bold bg-gray-200 text-gray-800 border border-gray-300 px-2.5 py-1 rounded" x-text="'OS: ' + osNumber"></span>
+                </div>
+
+                <input type="file" x-ref="cameraInput" @change="handlePhotoCapture" accept="image/*" capture="environment" class="hidden">
+
+                <button type="button" @click="triggerCamera" :disabled="loading" class="w-full py-5 rounded-xl font-bold flex flex-col items-center justify-center gap-1.5 transition disabled:opacity-50 btn-camera shadow-sm">
+                    <span class="text-2xl">📸</span>
+                    <span x-show="!loading" class="text-sm font-bold">Tirar Foto com Câmera</span>
+                    <span x-show="loading" class="text-xs animate-pulse">Comprimindo e Carimbando...</span>
+                </button>
+
+                <div class="space-y-4 mt-4">
+                    <template x-for="(photo, index) in photos" :key="photo.id">
+                        <div class="p-3.5 bg-white border border-gray-300 rounded-xl shadow-sm flex flex-col gap-3">
+                            <div class="relative w-full rounded-lg overflow-hidden border border-gray-200" style="min-height: 240px; height: 260px; background-color: #111827;">
+                                <img :src="photo.url" class="w-full h-full object-cover block" alt="Evidência Fotográfica">
+
+                                <div class="absolute top-2 right-2 flex gap-1 rounded-md p-1 z-20" style="background-color: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.2);">
+                                    <button
+                                        type="button"
+                                        @click="movePhoto(index, -1)"
+                                        :disabled="index === 0"
+                                        class="w-8 h-8 flex items-center justify-center text-sm font-bold text-white rounded hover:bg-white/20 disabled:opacity-20 transition"
+                                        title="Mover para cima">
+                                        ▲
+                                    </button>
+                                    <button
+                                        type="button"
+                                        @click="movePhoto(index, 1)"
+                                        :disabled="index === photos.length - 1"
+                                        class="w-8 h-8 flex items-center justify-center text-sm font-bold text-white rounded hover:bg-white/20 disabled:opacity-20 transition"
+                                        title="Mover para baixo">
+                                        ▼
+                                    </button>
+                                </div>
+
+                                <div class="absolute bottom-2 left-2 text-white text-xs font-mono font-semibold px-2.5 py-1 rounded z-20" style="background-color: rgba(0, 0, 0, 0.75); border: 1px solid rgba(255, 255, 255, 0.2);">
+                                    Foto #<span x-text="index + 1"></span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">
+                                    Observação da Foto #<span x-text="index + 1"></span>:
+                                </label>
+                                <input
+                                    type="text"
+                                    x-model="photo.observation"
+                                    @change="updatePhotoObservation(photo.id, photo.observation)"
+                                    placeholder="Ex: Disjuntor identificado / Quadro energizado"
+                                    class="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:bg-white focus:ring-2 focus:ring-blue-600 outline-none">
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div x-show="photos.length === 0" x-cloak class="text-center py-8 text-gray-400 text-xs">
+                    Nenhuma foto capturada nesta OS.
+                </div>
+
+                <div class="pt-4 border-t border-gray-200 space-y-2">
+                    <button
+                        type="button"
+                        @click="finalize"
+                        :disabled="loading || photos.length === 0"
+                        class="w-full py-3.5 px-4 rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
+                        :class="photos.length > 0 && !loading ? 'btn-finalize-active' : 'btn-finalize-disabled'">
+                        <span x-show="!loading">Finalizar Relatório e Gerar PDF</span>
+                        <span x-show="loading" x-cloak class="animate-pulse flex items-center gap-1.5 text-white">
+                            <span>⏳</span> Compilando Documento...
+                        </span>
+                    </button>
+
+                    <button type="button" @click="step = 1" class="w-full py-2 text-xs font-medium text-gray-500 hover:text-gray-900 text-center block transition">
+                        &larr; Voltar para os dados da OS
+                    </button>
+                </div>
+            </section>
+
+            <!-- ETAPA 3: Conclusão -->
+            <section x-show="step === 3" x-cloak class="space-y-6 text-center py-4">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl font-bold border border-emerald-300 shadow-sm">
+                    ✓
+                </div>
+
+                <div class="space-y-1">
+                    <h2 class="text-lg font-bold text-gray-900">Relatório Concluído!</h2>
+                    <p class="text-xs text-gray-500">
+                        A Ordem de Serviço <strong class="text-gray-800" x-text="osNumber"></strong> foi finalizada e o PDF gerado.
+                    </p>
+                </div>
+
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5">
+                    <button
+                        type="button"
+                        @click="shareWhatsapp"
+                        class="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                        <span>💬</span> Compartilhar no WhatsApp
+                    </button>
+
+                    <button
+                        type="button"
+                        @click="shareReport"
+                        class="w-full py-2.5 px-4 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg font-semibold text-xs transition flex items-center justify-center gap-2">
+                        <span>📲</span> Outras Formas de Envio
+                    </button>
+
+                    <a
+                        :href="pdfUrl"
+                        target="_blank"
+                        class="w-full py-2.5 px-4 bg-gray-800 hover:bg-black text-white rounded-lg font-semibold text-xs transition block text-center shadow-sm">
+                        Visualizar PDF no Navegador
+                    </a>
+                </div>
+
+                <div class="pt-2 border-t border-gray-200">
+                    <button
+                        type="button"
+                        @click="resetFlow"
+                        class="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-md transition flex items-center justify-center gap-2">
+                        <span>＋</span> Iniciar Novo Relatório
+                    </button>
+                    <p class="text-[11px] text-gray-400 mt-2">Os campos serão limpos para uma nova ordem de serviço.</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW ativo:', reg.scope))
+                    .catch(err => console.error('Erro SW:', err));
+            });
+        }
+    </script>
+</body>
+</html>
+<?php /**PATH C:\Projetos\reports\foto-os\resources\views/pwa/index.blade.php ENDPATH**/ ?>
 
 
 ========================================
