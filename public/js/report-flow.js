@@ -159,6 +159,18 @@ function registerReportFlow() {
         debounceSearchTimer: null,
 
         async init() {
+            // Se estiver sem internet, ignora a requisição AJAX para não gerar erro
+            if (!navigator.onLine) {
+                console.info('Modo Offline: Usando cache ou limitando taxonomias.');
+                return;
+            }
+
+            try {
+                const res = await axios.get('/api/taxonomies/units');
+                this.availableUnits = res.data || [];
+            } catch (e) {
+                console.warn('Falha na rede: Taxonomias indisponíveis.', e);
+            }
             await this.loadTaxonomies();
 
             this.$watch('unit', () => this.filterUnits());
@@ -244,7 +256,12 @@ function registerReportFlow() {
 
         async searchOs() {
             const os = this.osNumber.trim();
-            if (!os || os.length < 2 || !navigator.onLine) return;
+
+            // TRAVA CRÍTICA: Se não houver OS, ou não houver internet,
+            // a busca no servidor NÃO pode ser disparada.
+            if (!os || os.length < 2 || !navigator.onLine) {
+                return;
+            }
 
             try {
                 const response = await axios.get('/api/reports/search', { params: { os_number: os } });
@@ -273,7 +290,10 @@ function registerReportFlow() {
                     this.errorMessage = '';
                 }
             } catch (err) {
-                console.warn('Erro ao pesquisar OS:', err);
+                // Se a rede cair EXATAMENTE DURANTE o request, silencia o erro visual na tela
+                console.warn('Erro isolado de rede ao pesquisar OS:', err);
+                this.errorMessage = '';
+                this.successMessage = '';
             }
         },
 
