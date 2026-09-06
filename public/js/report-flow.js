@@ -1,4 +1,4 @@
-async function compressImage(file, maxDimension = 1920, quality = 0.9) {
+async function compressImage(file, maxDimension = 1920, quality = 0.85) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -28,7 +28,7 @@ async function compressImage(file, maxDimension = 1920, quality = 0.9) {
                 ctx.drawImage(img, 0, 0, width, height);
 
                 canvas.toBlob((blob) => {
-                    resolve(new File([blob], file.name, {
+                    resolve(new File([blob], file.name || 'foto.jpg', {
                         type: 'image/jpeg',
                         lastModified: Date.now()
                     }));
@@ -52,7 +52,7 @@ const OfflineStore = {
                         db.createObjectStore('pending_reports', { keyPath: 'client_temp_id' });
                     }
                     if (!db.objectStoreNames.contains('pending_photos')) {
-                        db.createObjectStore('pending_photos', { autoIncrement: true });
+                        db.createObjectStore('pending_photos', { keyPath: 'client_photo_id' });
                     }
                 };
                 req.onsuccess = () => resolve(req.result);
@@ -61,6 +61,7 @@ const OfflineStore = {
         }
         return this.dbPromise;
     },
+
     async savePendingReport(data) {
         const db = await this.init();
         return new Promise((res, rej) => {
@@ -70,15 +71,17 @@ const OfflineStore = {
             tx.onerror = () => rej(tx.error);
         });
     },
+
     async savePendingPhoto(data) {
         const db = await this.init();
         return new Promise((res, rej) => {
             const tx = db.transaction('pending_photos', 'readwrite');
-            tx.objectStore('pending_photos').add(data);
+            tx.objectStore('pending_photos').put(data);
             tx.oncomplete = () => res();
             tx.onerror = () => rej(tx.error);
         });
     },
+
     async getPendingReports() {
         const db = await this.init();
         return new Promise((res) => {
@@ -87,6 +90,7 @@ const OfflineStore = {
             req.onsuccess = () => res(req.result || []);
         });
     },
+
     async getPendingPhotos() {
         const db = await this.init();
         return new Promise((res) => {
@@ -95,10 +99,25 @@ const OfflineStore = {
             req.onsuccess = () => res(req.result || []);
         });
     },
-    async clearSynced(storeName) {
+
+    async deletePhoto(clientPhotoId) {
         const db = await this.init();
-        const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).clear();
+        return new Promise((res, rej) => {
+            const tx = db.transaction('pending_photos', 'readwrite');
+            tx.objectStore('pending_photos').delete(clientPhotoId);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
+    },
+
+    async deleteReport(clientTempId) {
+        const db = await this.init();
+        return new Promise((res, rej) => {
+            const tx = db.transaction('pending_reports', 'readwrite');
+            tx.objectStore('pending_reports').delete(clientTempId);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
     }
 };
 
@@ -113,6 +132,13 @@ function registerReportFlow() {
         reportId: null,
         pdfUrl: null,
         isFinalized: false,
+
+        // Status de Rede e Sincronização
+        isOnline: navigator.onLine,
+        isSyncing: false,
+        syncProgress: 0,
+        syncTotal: 0,
+        syncStatusText: '',
 
         // Taxonomias Dinâmicas & Autocomplete
         availableUnits: [],
@@ -130,7 +156,6 @@ function registerReportFlow() {
         history: '',
         photos: [],
 
-        // Debounce da Busca por OS
         debounceSearchTimer: null,
 
         async init() {
@@ -140,13 +165,24 @@ function registerReportFlow() {
             this.$watch('sectorInput', () => this.filterSectors());
 
             window.addEventListener('online', () => {
+                this.isOnline = true;
                 this.syncPendingData();
             });
+
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+                this.errorMessage = 'Sem conexão à internet. Operando em modo offline.';
+            });
+
+            // Se carregar já conectado, verifica se existem relatórios pendentes
+            if (this.isOnline) {
+                this.syncPendingData();
+            }
         },
 
         async loadTaxonomies() {
             try {
-                const res = await axios.get('/api/v1/taxonomies/units');
+                const res = await axios.get('/api/taxonomies/units');
                 this.availableUnits = res.data || [];
             } catch (e) {
                 console.warn('Modo offline: Taxonomias indisponíveis na rede.', e);
@@ -208,10 +244,10 @@ function registerReportFlow() {
 
         async searchOs() {
             const os = this.osNumber.trim();
-            if (!os || os.length < 2) return;
+            if (!os || os.length < 2 || !navigator.onLine) return;
 
             try {
-                const response = await axios.get('/api/v1/reports/search', { params: { os_number: os } });
+                const response = await axios.get('/api/reports/search', { params: { os_number: os } });
                 if (response.data.found) {
                     const r = response.data.data;
                     this.reportId = r.id;
@@ -242,13 +278,13 @@ function registerReportFlow() {
         },
 
         async reopenReport() {
-            if (!this.reportId) return;
+            if (!this.reportId || !navigator.onLine) return;
             this.loading = true;
             this.errorMessage = '';
             try {
-                await axios.post(`/api/v1/reports/${this.reportId}/reopen`);
+                await axios.post(`/api/reports/${this.reportId}/reopen`);
                 this.isFinalized = false;
-                this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e avançar para fotos.';
+                this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e capturar mais fotos.';
             } catch (err) {
                 this.errorMessage = err.response?.data?.error || 'Erro ao reabrir OS.';
             } finally {
@@ -290,7 +326,7 @@ function registerReportFlow() {
 
             try {
                 if (navigator.onLine) {
-                    const response = await axios.post('/api/v1/reports', payload);
+                    const response = await axios.post('/api/reports', payload);
                     this.reportId = response.data.data.id;
                     this.step = 2;
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -306,7 +342,16 @@ function registerReportFlow() {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 }
             } catch (err) {
-                this.errorMessage = err.response?.data?.message || 'Falha ao iniciar relatório.';
+                // Se falhar na rede, faz fallback para armazenamento offline
+                const tempId = this.reportId || ('temp_' + Date.now());
+                this.reportId = tempId;
+                await OfflineStore.savePendingReport({
+                    client_temp_id: tempId,
+                    ...payload,
+                    created_at: new Date().toISOString()
+                });
+                this.step = 2;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             } finally {
                 this.loading = false;
             }
@@ -325,7 +370,7 @@ function registerReportFlow() {
 
             let fileToSend = rawFile;
             try {
-                fileToSend = await compressImage(rawFile, 1920, 0.9);
+                fileToSend = await compressImage(rawFile, 1920, 0.85);
             } catch (error) {
                 console.warn('Falha na compressão client-side:', error);
             }
@@ -341,7 +386,6 @@ function registerReportFlow() {
                 console.warn('GPS indisponível:', posError);
                 lat = -22.7641;
                 lng = -43.3994;
-                alert('Aviso: GPS real inacessível. Coordenadas de contingência ativadas.');
             }
 
             const formData = new FormData();
@@ -350,9 +394,11 @@ function registerReportFlow() {
             formData.append('longitude', lng);
             formData.append('observation', '');
 
+            const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
+
             try {
-                if (navigator.onLine && !this.reportId.startsWith('temp_')) {
-                    const response = await axios.post(`/api/v1/reports/${this.reportId}/photos`, formData, {
+                if (navigator.onLine && !isTemporary) {
+                    const response = await axios.post(`/api/reports/${this.reportId}/photos`, formData, {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
 
@@ -362,7 +408,9 @@ function registerReportFlow() {
                         observation: ''
                     });
                 } else {
+                    const clientPhotoId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
                     await OfflineStore.savePendingPhoto({
+                        client_photo_id: clientPhotoId,
                         report_client_id: this.reportId,
                         blob: fileToSend,
                         latitude: lat,
@@ -371,13 +419,28 @@ function registerReportFlow() {
                     });
 
                     this.photos.push({
-                        id: 'local_' + Date.now(),
+                        id: clientPhotoId,
                         url: URL.createObjectURL(fileToSend),
                         observation: ''
                     });
                 }
             } catch (err) {
-                this.errorMessage = err.response?.data?.message || 'Erro ao processar envio da foto.';
+                // Fallback de contingência local em erro de transmissão
+                const clientPhotoId = 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+                await OfflineStore.savePendingPhoto({
+                    client_photo_id: clientPhotoId,
+                    report_client_id: this.reportId,
+                    blob: fileToSend,
+                    latitude: lat,
+                    longitude: lng,
+                    created_at: new Date().toISOString()
+                });
+
+                this.photos.push({
+                    id: clientPhotoId,
+                    url: URL.createObjectURL(fileToSend),
+                    observation: ''
+                });
             } finally {
                 this.loading = false;
                 event.target.value = '';
@@ -391,16 +454,16 @@ function registerReportFlow() {
                 }
                 navigator.geolocation.getCurrentPosition(resolve, reject, {
                     enableHighAccuracy: true,
-                    timeout: 10000,
+                    timeout: 8000,
                     maximumAge: 0
                 });
             });
         },
 
         async updatePhotoObservation(photoId, observation) {
-            if (photoId.startsWith('local_')) return;
+            if (String(photoId).startsWith('local_')) return;
             try {
-                await axios.patch(`/api/v1/photos/${photoId}`, { observation });
+                await axios.patch(`/api/photos/${photoId}`, { observation });
             } catch (err) {
                 console.warn('Falha ao atualizar observação:', err);
             }
@@ -413,44 +476,77 @@ function registerReportFlow() {
             const item = this.photos.splice(index, 1)[0];
             this.photos.splice(targetIndex, 0, item);
 
-            if (navigator.onLine && !this.reportId.startsWith('temp_')) {
+            const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
+            if (navigator.onLine && !isTemporary) {
                 const order = this.photos.map(p => p.id);
-                axios.patch(`/api/v1/reports/${this.reportId}/photos/reorder`, { order });
+                axios.patch(`/api/reports/${this.reportId}/photos/reorder`, { order });
             }
         },
 
         async syncPendingData() {
-            if (!navigator.onLine) return;
-            const pendingReports = await OfflineStore.getPendingReports();
+            if (this.isSyncing || !navigator.onLine) return;
 
-            for (const rep of pendingReports) {
+            const pendingReports = await OfflineStore.getPendingReports();
+            if (pendingReports.length === 0) return;
+
+            this.isSyncing = true;
+            this.syncTotal = pendingReports.length;
+            this.syncProgress = 0;
+
+            for (let i = 0; i < pendingReports.length; i++) {
+                const rep = pendingReports[i];
+                this.syncStatusText = `Sincronizando OS ${rep.os_number} (${i + 1}/${this.syncTotal})...`;
+
                 try {
-                    const res = await axios.post('/api/v1/reports', {
+                    const res = await axios.post('/api/reports', {
                         os_number: rep.os_number,
                         unit: rep.unit,
                         sectors: rep.sectors,
                         technicians: rep.technicians,
                         history: rep.history
                     });
-                    const realId = res.data.data.id;
+
+                    const realReportId = res.data.data.id;
+                    if (this.reportId === rep.client_temp_id) {
+                        this.reportId = realReportId;
+                    }
 
                     const pendingPhotos = await OfflineStore.getPendingPhotos();
-                    for (const photo of pendingPhotos) {
-                        if (photo.report_client_id === rep.client_temp_id) {
-                            const formData = new FormData();
-                            formData.append('photo', photo.blob);
-                            formData.append('latitude', photo.latitude);
-                            formData.append('longitude', photo.longitude);
-                            formData.append('observation', photo.observation || '');
-                            await axios.post(`/api/v1/reports/${realId}/photos`, formData);
-                        }
+                    const photosToSync = pendingPhotos.filter(p => p.report_client_id === rep.client_temp_id);
+
+                    for (let j = 0; j < photosToSync.length; j++) {
+                        const photo = photosToSync[j];
+                        this.syncStatusText = `Enviando foto ${j + 1}/${photosToSync.length} da OS ${rep.os_number}...`;
+
+                        const formData = new FormData();
+                        formData.append('photo', photo.blob, 'foto.jpg');
+                        formData.append('latitude', photo.latitude);
+                        formData.append('longitude', photo.longitude);
+                        formData.append('observation', photo.observation || '');
+
+                        await axios.post(`/api/reports/${realReportId}/photos`, formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                        });
+
+                        await OfflineStore.deletePhoto(photo.client_photo_id);
                     }
+
+                    if (rep.is_finalized) {
+                        await axios.post(`/api/reports/${realReportId}/finalize`);
+                    }
+
+                    await OfflineStore.deleteReport(rep.client_temp_id);
                 } catch (err) {
-                    console.error('Falha na sincronização em lote:', err);
+                    console.error('Falha na sincronização do relatório:', err);
                 }
+
+                this.syncProgress = Math.round(((i + 1) / this.syncTotal) * 100);
             }
-            await OfflineStore.clearSynced('pending_reports');
-            await OfflineStore.clearSynced('pending_photos');
+
+            this.isSyncing = false;
+            this.syncStatusText = '';
+            this.successMessage = 'Dados sincronizados com sucesso com o servidor!';
+            setTimeout(() => { this.successMessage = ''; }, 4000);
         },
 
         async finalize() {
@@ -460,13 +556,24 @@ function registerReportFlow() {
             }
 
             this.loading = true;
+            const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
+
             try {
-                if (navigator.onLine && !this.reportId.startsWith('temp_')) {
-                    const res = await axios.post(`/api/v1/reports/${this.reportId}/finalize`);
+                if (navigator.onLine && !isTemporary) {
+                    const res = await axios.post(`/api/reports/${this.reportId}/finalize`);
                     this.pdfUrl = res.data.data.pdf_url;
                     this.step = 3;
                 } else {
-                    alert('Relatório gravado offline. Conecte-se à internet para sincronizar e gerar o PDF.');
+                    if (this.reportId) {
+                        const pendingReports = await OfflineStore.getPendingReports();
+                        const currentRep = pendingReports.find(r => r.client_temp_id === this.reportId);
+                        if (currentRep) {
+                            currentRep.is_finalized = true;
+                            await OfflineStore.savePendingReport(currentRep);
+                        }
+                    }
+                    alert('Relatório gravado offline com sucesso! Ele será enviado e o PDF gerado assim que o dispositivo recuperar o sinal de internet.');
+                    this.resetFlow();
                 }
             } catch (err) {
                 this.errorMessage = err.response?.data?.message || 'Erro ao finalizar relatório.';
