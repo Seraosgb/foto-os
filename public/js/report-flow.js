@@ -121,7 +121,6 @@ const OfflineStore = {
     }
 };
 
-// Aqui utilizamos a abordagem nativa do AlpineJS para registro tardio (Deferred Registration)
 document.addEventListener('alpine:init', () => {
     Alpine.data('reportFlow', () => ({
         step: 1,
@@ -184,8 +183,7 @@ document.addEventListener('alpine:init', () => {
 
         async loadTaxonomies() {
             try {
-                // Força o uso do window.axios para evitar quebra no bundle do Vite
-                const res = await window.axios.get('/api/taxonomies/units');
+                const res = await window.axios.get('/api/v1/taxonomies/units');
                 this.availableUnits = res.data || [];
             } catch (e) {
                 console.warn('Falha na rede: Taxonomias indisponíveis.', e);
@@ -253,7 +251,7 @@ document.addEventListener('alpine:init', () => {
             }
 
             try {
-                const response = await window.axios.get('/api/reports/search', { params: { os_number: os } });
+                const response = await window.axios.get('/api/v1/reports/search', { params: { os_number: os } });
                 if (response.data.found) {
                     const r = response.data.data;
                     this.reportId = r.id;
@@ -290,7 +288,7 @@ document.addEventListener('alpine:init', () => {
             this.loading = true;
             this.errorMessage = '';
             try {
-                await window.axios.post(`/api/reports/${this.reportId}/reopen`);
+                await window.axios.post(`/api/v1/reports/${this.reportId}/reopen`);
                 this.isFinalized = false;
                 this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e capturar mais fotos.';
             } catch (err) {
@@ -347,7 +345,7 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 if (navigator.onLine) {
-                    const response = await window.axios.post('/api/reports', payload);
+                    const response = await window.axios.post('/api/v1/reports', payload);
                     this.reportId = response.data.data.id;
                     this.step = 2;
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -403,7 +401,7 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 if (navigator.onLine && !isTemporary) {
-                    const response = await window.axios.post(`/api/reports/${this.reportId}/photos`, formData, {
+                    const response = await window.axios.post(`/api/v1/reports/${this.reportId}/photos`, formData, {
                         headers: { 'Content-Type': 'multipart/form-data' }
                     });
 
@@ -467,7 +465,7 @@ document.addEventListener('alpine:init', () => {
         async updatePhotoObservation(photoId, observation) {
             if (String(photoId).startsWith('local_')) return;
             try {
-                await window.axios.patch(`/api/photos/${photoId}`, { observation });
+                await window.axios.patch(`/api/v1/photos/${photoId}`, { observation });
             } catch (err) {
                 console.warn('Falha ao atualizar observação:', err);
             }
@@ -483,7 +481,7 @@ document.addEventListener('alpine:init', () => {
             const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
             if (navigator.onLine && !isTemporary) {
                 const order = this.photos.map(p => p.id);
-                window.axios.patch(`/api/reports/${this.reportId}/photos/reorder`, { order });
+                window.axios.patch(`/api/v1/reports/${this.reportId}/photos/reorder`, { order });
             }
         },
 
@@ -502,7 +500,7 @@ document.addEventListener('alpine:init', () => {
                 this.syncStatusText = `Sincronizando OS ${rep.os_number} (${i + 1}/${this.syncTotal})...`;
 
                 try {
-                    const res = await window.axios.post('/api/reports', {
+                    const res = await window.axios.post('/api/v1/reports', {
                         os_number: rep.os_number,
                         unit: rep.unit,
                         sectors: rep.sectors,
@@ -528,7 +526,7 @@ document.addEventListener('alpine:init', () => {
                         formData.append('longitude', photo.longitude);
                         formData.append('observation', photo.observation || '');
 
-                        await window.axios.post(`/api/reports/${realReportId}/photos`, formData, {
+                        await window.axios.post(`/api/v1/reports/${realReportId}/photos`, formData, {
                             headers: { 'Content-Type': 'multipart/form-data' }
                         });
 
@@ -536,7 +534,7 @@ document.addEventListener('alpine:init', () => {
                     }
 
                     if (rep.is_finalized) {
-                        await window.axios.post(`/api/reports/${realReportId}/finalize`);
+                        await window.axios.post(`/api/v1/reports/${realReportId}/finalize`);
                     }
 
                     await OfflineStore.deleteReport(rep.client_temp_id);
@@ -564,7 +562,7 @@ document.addEventListener('alpine:init', () => {
 
             try {
                 if (navigator.onLine && !isTemporary) {
-                    const res = await window.axios.post(`/api/reports/${this.reportId}/finalize`);
+                    const res = await window.axios.post(`/api/v1/reports/${this.reportId}/finalize`);
                     this.pdfUrl = res.data.data.pdf_url;
                     this.step = 3;
                 } else {
