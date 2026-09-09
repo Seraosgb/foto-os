@@ -48,7 +48,7 @@
             background-color: #fafafa;
         }
         .photo-img {
-            max-width: 50%;
+            max-width: 45%;
             height: auto;
             display: block;
             margin: 0 auto;
