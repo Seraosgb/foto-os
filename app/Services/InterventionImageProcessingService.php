@@ -51,7 +51,7 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
         // 4. Redimensiona mantendo a proporção (baseado na MAIOR aresta)
         $width = imagesx($image);
         $height = imagesy($image);
-        $maxDimension = 1280;
+        $maxDimension = 1024;
 
         if ($width > $maxDimension || $height > $maxDimension) {
             if ($width > $height) {
@@ -122,7 +122,7 @@ class InterventionImageProcessingService implements ImageProcessingServiceInterf
             mkdir(storage_path("app/public/{$processedDir}"), 0755, true);
         }
 
-        imagejpeg($image, $processedFullPath, 85);
+        imagejpeg($image, $processedFullPath, 75);
         imagedestroy($image);
 
         $processedPath = "{$processedDir}/{$filename}";
