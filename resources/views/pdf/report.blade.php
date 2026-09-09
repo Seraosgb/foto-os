@@ -42,21 +42,19 @@
         }
         .photo-card {
             page-break-inside: avoid;
-            margin-bottom: 12px;
+            margin-bottom: 15px;
             border: 1px solid #e5e7eb;
-            padding: 6px 8px;
+            padding: 8px;
             background-color: #fafafa;
         }
         .photo-img {
-            max-width: 100%;
-            max-height: 220px; /* Reduzido para caber mais fotos desde a primeira página */
-            width: auto;
+            max-width: 40%;
             height: auto;
             display: block;
             margin: 0 auto;
         }
         .photo-obs {
-            margin-top: 4px;
+            margin-top: 6px;
             font-size: 10px;
             color: #4b5563;
         }
@@ -115,25 +113,19 @@
         </tr>
     </table>
 
-    <div style="margin-top: 10px;">
+    <div style="margin-top: 15px;">
         @forelse($report->photos as $index => $photo)
             @php
                 $photoPath = storage_path('app/public/' . $photo->processed_path);
-                $photoSrc = '';
-                if (file_exists($photoPath)) {
-                    $imageData = file_get_contents($photoPath);
-                    $mimeType = mime_content_type($photoPath);
-                    $photoSrc = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-                }
             @endphp
             <div class="photo-card">
-                <div style="font-weight: bold; margin-bottom: 3px; color: #374151; font-size: 10px;">
+                <div style="font-weight: bold; margin-bottom: 4px; color: #374151;">
                     Evidência Fotográfica #{{ $index + 1 }}
                 </div>
-                @if($photoSrc)
-                    <img src="{{ $photoSrc }}" class="photo-img">
+                @if(file_exists($photoPath))
+                    <img src="{{ $photoPath }}" class="photo-img">
                 @else
-                    <div style="padding: 10px; text-align: center; color: #ef4444;">Imagem não localizada no armazenamento físico.</div>
+                    <div style="padding: 20px; text-align: center; color: #ef4444;">Imagem não localizada no armazenamento físico.</div>
                 @endif
                 @if($photo->observation)
                     <div class="photo-obs">
