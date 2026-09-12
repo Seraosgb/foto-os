@@ -61,6 +61,15 @@ const OfflineStore = {
                 req.onerror = () => reject(req.error);
             });
         }
+        // Escuta os avisos vindos do Service Worker (Background Sync)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'TRIGGER_SYNC') {
+                    console.info('Sinal de Background Sync recebido!');
+                    this.syncPendingData();
+                }
+            });
+        }
         return this.dbPromise;
     },
 
