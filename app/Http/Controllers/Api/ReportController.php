@@ -11,30 +11,61 @@ use App\Models\Company;
 use App\Models\ReportStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
     public function store(StoreReportRequest $request, ReportService $service): JsonResponse
     {
-        $tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id;
+        // Resolução Multi-Tenant
+        $tenantId = session()->get('tenant_id') ?? auth()->user()?->company_id ?? Company::first()?->id;
 
-        if (empty($tenantId)) {
-            $tenantId = Company::first()?->id;
+        $osNumber = $request->validated('os_number');
+        $incomingHistory = trim((string) $request->validated('history'));
+        $incomingTechs = trim((string) $request->validated('technicians'));
+
+        // Busca se a OS já foi criada no servidor (por outro técnico ou sync anterior)
+        $existingReport = Report::withoutGlobalScopes()
+            ->where('company_id', $tenantId)
+            ->where('os_number', $osNumber)
+            ->first();
+
+        if ($existingReport) {
+            // Upsert Segregado: Preserva e concatena o histórico
+            $mergedHistory = trim((string) $existingReport->history);
+            if (!empty($incomingHistory) && $mergedHistory !== $incomingHistory) {
+                $mergedHistory .= "\n\n[Atualização Offline - " . now()->format('d/m/Y H:i') . "]:\n" . $incomingHistory;
+            }
+
+            // Concatena os técnicos caso seja um colega diferente na mesma OS
+            $mergedTechnicians = (string) $existingReport->technicians;
+            if (!empty($incomingTechs) && !str_contains($mergedTechnicians, $incomingTechs)) {
+                $mergedTechnicians .= empty($mergedTechnicians) ? $incomingTechs : ', ' . $incomingTechs;
+            }
+
+            // Atualiza garantindo a compatibilidade retroativa
+            $existingReport->update([
+                'history' => trim($mergedHistory),
+                'technicians' => trim($mergedTechnicians),
+            ]);
+
+            $report = $existingReport;
+            $message = 'Relatório offline sincronizado (Upsert) com sucesso!';
+        } else {
+            // Fluxo Normal: Nova OS
+            $dto = new StoreReportDTO(
+                osNumber: $osNumber,
+                unit: $request->validated('unit'),
+                sectors: $request->validated('sectors'),
+                history: $incomingHistory,
+                technicians: $incomingTechs
+            );
+
+            $report = $service->createProgressiveReport($dto, (string) $tenantId);
+            $message = 'Relatório criado com sucesso!';
         }
 
-        $dto = new StoreReportDTO(
-            osNumber: $request->validated('os_number'),
-            unit: $request->validated('unit'),
-            sectors: $request->validated('sectors'),
-            history: $request->validated('history'),
-            technicians: $request->validated('technicians')
-        );
-
-        $report = $service->createProgressiveReport($dto, (string) $tenantId);
-
         return response()->json([
-            'message' => 'Relatório salvo com sucesso!',
+            'message' => $message,
             'data' => [
                 'id' => $report->id,
                 'os_number' => $report->os_number,
