@@ -37,7 +37,7 @@
 </head>
 <body class="bg-gray-100 text-gray-800 antialiased min-h-screen">
 
-    <div x-data="reportFlow" class="max-w-lg mx-auto min-h-screen bg-white shadow-xl flex flex-col justify-between">
+    <div x-data="reportFlow" class="max-w-lg mx-auto min-h-screen bg-white shadow-xl flex flex-col justify-between relative pb-20">
 
         <!-- Topo / Barra de Status -->
         <header class="bg-gray-800 text-white px-5 py-3.5 flex items-center justify-between sticky top-0 z-50 border-b border-gray-700" style="background-color: #111827;">
@@ -333,6 +333,29 @@
             </section>
 
         </main>
+
+        <!-- AQUI ENTRA A BARRA DE SINCRONIZAÇÃO OFFLINE -->
+        <div x-show="isSyncing"
+             x-transition.opacity
+             x-cloak
+             class="fixed bottom-0 left-0 z-50 w-full p-4 bg-white border-t border-gray-200 shadow-[0_-4px_10px_-1px_rgba(0,0,0,0.1)] rounded-t-xl">
+
+            <div class="max-w-md mx-auto">
+                <!-- Textos dinâmicos -->
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-blue-700 animate-pulse" x-text="syncStatusText"></span>
+                    <span class="text-sm font-bold text-blue-700" x-text="syncProgress + '%'"></span>
+                </div>
+
+                <!-- Fundo da barra -->
+                <div class="w-full h-3 overflow-hidden bg-gray-200 rounded-full">
+                    <!-- Preenchimento dinâmico com transição suave -->
+                    <div class="h-3 transition-all duration-500 ease-out bg-blue-600 rounded-full"
+                         :style="`width: ${syncProgress}%`"></div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
