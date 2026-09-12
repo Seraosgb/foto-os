@@ -1,4 +1,4 @@
-const CACHE_NAME = 'foto-os-v5';
+const CACHE_NAME = 'foto-os-v6';
 
 const ASSETS_TO_CACHE = [
     '/',
@@ -53,6 +53,10 @@ async function processBackgroundSync() {
 }
 
 self.addEventListener('fetch', (event) => {
+    // 🛡️ TRAVA: Ignora requisições de extensões (chrome-extension://)
+    if (!event.request.url.startsWith('http')) {
+        return;
+    }
     const url = new URL(event.request.url);
 
     // 1. Não intercepta chamadas de API (tratadas pelo IndexedDB / Axios)
