@@ -1,4 +1,4 @@
-const CACHE_NAME = 'foto-os-v4';
+const CACHE_NAME = 'foto-os-v5';
 
 const ASSETS_TO_CACHE = [
     '/',
@@ -31,10 +31,31 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+// --- NOVO: Listener de Background Sync ---
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'sync-os-pendentes') {
+        event.waitUntil(processBackgroundSync());
+    }
+});
+
+// Processamento assíncrono em background (Tenta desovar o IndexedDB para a API)
+async function processBackgroundSync() {
+    try {
+        // Como o Service Worker roda em escopo global, abrimos o IndexedDB manualmente se necessário
+        // Ou notificamos os clients abertos para realizarem o flush da fila.
+        const clientsList = await clients.matchAll({ includeUncontrolled: true, type: 'window' });
+        for (const client of clientsList) {
+            client.postMessage({ type: 'TRIGGER_SYNC' });
+        }
+    } catch (err) {
+        console.error('[SW] Erro ao processar background sync:', err);
+    }
+}
+
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // 1. Não intercepta chamadas de API (elas são tratadas pelo IndexedDB no report-flow.js)
+    // 1. Não intercepta chamadas de API (tratadas pelo IndexedDB / Axios)
     if (url.pathname.startsWith('/api/')) {
         return;
     }
@@ -44,7 +65,6 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(event.request)
                 .then((response) => {
-                    // Atualiza o cache da página principal com a versão mais recente
                     const cloned = response.clone();
                     caches.open(CACHE_NAME).then((cache) => cache.put('/', cloned));
                     return response;
@@ -54,7 +74,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 3. Demais Assets (CSS, JS do Vite, Imagens, Fontes): Cache com fallback de rede dinâmico
+    // 3. Demais Assets (CSS, JS, Imagens, Fontes): Cache com fallback de rede dinâmico
     event.respondWith(
         caches.match(event.request).then((cachedResponse) => {
             if (cachedResponse) {

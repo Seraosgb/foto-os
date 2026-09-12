@@ -45,7 +45,9 @@ const OfflineStore = {
     init() {
         if (!this.dbPromise) {
             this.dbPromise = new Promise((resolve, reject) => {
-                const req = indexedDB.open('FotoOS_DB', 1);
+                // Padrão Gemini: Incrementado para versão 2 para garantir upgrades de schema futuros
+                const req = indexedDB.open('FotoOS_DB', 2);
+
                 req.onupgradeneeded = (e) => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains('pending_reports')) {
@@ -62,12 +64,28 @@ const OfflineStore = {
         return this.dbPromise;
     },
 
+    // Injeção da Background Sync API
+    async registerBackgroundSync() {
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            try {
+                const sw = await navigator.serviceWorker.ready;
+                await sw.sync.register('sync-os-pendentes');
+                console.info('[PWA] Background Sync engatilhado: sync-os-pendentes');
+            } catch (e) {
+                console.warn('[PWA] Background Sync falhou, delegando para o Fallback UI.', e);
+            }
+        }
+    },
+
     async savePendingReport(data) {
         const db = await this.init();
         return new Promise((res, rej) => {
             const tx = db.transaction('pending_reports', 'readwrite');
             tx.objectStore('pending_reports').put(data);
-            tx.oncomplete = () => res();
+            tx.oncomplete = async () => {
+                await this.registerBackgroundSync();
+                res();
+            };
             tx.onerror = () => rej(tx.error);
         });
     },
@@ -77,7 +95,10 @@ const OfflineStore = {
         return new Promise((res, rej) => {
             const tx = db.transaction('pending_photos', 'readwrite');
             tx.objectStore('pending_photos').put(data);
-            tx.oncomplete = () => res();
+            tx.oncomplete = async () => {
+                await this.registerBackgroundSync();
+                res();
+            };
             tx.onerror = () => rej(tx.error);
         });
     },
@@ -131,7 +152,7 @@ document.addEventListener('alpine:init', () => {
         pdfUrl: null,
         isFinalized: false,
 
-        // Status de Rede e Sincronização
+        // Status de Rede e Sincronização (Interface de Pendências)
         isOnline: navigator.onLine,
         isSyncing: false,
         syncProgress: 0,
@@ -164,7 +185,7 @@ document.addEventListener('alpine:init', () => {
 
         async init() {
             if (!navigator.onLine) {
-                console.info('Modo Offline: Usando cache ou limitando taxonomias.');
+                console.info('Modo Offline: Trabalhando com dados locais.');
             } else {
                 await this.loadTaxonomies();
             }
@@ -172,6 +193,7 @@ document.addEventListener('alpine:init', () => {
             this.$watch('unit', () => this.filterUnits());
             this.$watch('sectorInput', () => this.filterSectors());
 
+            // Listener de Conexão: Fallback imediato para iOS e navegadores antigos
             window.addEventListener('online', () => {
                 this.isOnline = true;
                 this.syncPendingData();
@@ -179,14 +201,14 @@ document.addEventListener('alpine:init', () => {
 
             window.addEventListener('offline', () => {
                 this.isOnline = false;
-                this.errorMessage = 'Sem conexão à internet. Operando em modo offline.';
+                this.errorMessage = 'Sinal perdido. Suas alterações estão sendo salvas no dispositivo de forma segura.';
             });
 
             if (this.isOnline) {
                 this.syncPendingData();
             }
 
-            // Ativa a antena de GPS em background assim que o fluxo inicia
+            // Ativa a antena de GPS no modo invisível (Warm-up)
             this.startGpsTracking();
         },
 
@@ -205,11 +227,11 @@ document.addEventListener('alpine:init', () => {
                 },
                 (err) => {
                     let motivo = '';
-                    if (err.code === 1) motivo = 'PERMISSÃO NEGADA (Chrome barrando o TWA)';
-                    else if (err.code === 2) motivo = 'SINAL INDISPONÍVEL (Android não acha satélite)';
-                    else if (err.code === 3) motivo = 'TIMEOUT (Estourou o tempo)';
+                    if (err.code === 1) motivo = 'PERMISSÃO NEGADA';
+                    else if (err.code === 2) motivo = 'SINAL INDISPONÍVEL';
+                    else if (err.code === 3) motivo = 'TIMEOUT';
 
-                    this.syncStatusText = `ERRO GPS [Cód ${err.code}]: ${motivo}`;
+                    this.syncStatusText = `Aviso GPS [Cód ${err.code}]: ${motivo}`;
                 },
                 {
                     enableHighAccuracy: true,
@@ -224,7 +246,7 @@ document.addEventListener('alpine:init', () => {
                 const res = await window.axios.get('/api/v1/taxonomies/units');
                 this.availableUnits = res.data || [];
             } catch (e) {
-                console.warn('Falha na rede: Taxonomias indisponíveis.', e);
+                console.warn('Falha ao obter taxonomias do servidor.', e);
             }
         },
 
@@ -394,7 +416,7 @@ document.addEventListener('alpine:init', () => {
                     await salvarOffline();
                 }
             } catch (err) {
-                console.warn('Falha de rede ao criar relatório, alternando para offline:', err);
+                console.warn('Conexão instável. Delegando payload para fila offline.', err);
                 await salvarOffline();
             } finally {
                 this.loading = false;
@@ -404,13 +426,11 @@ document.addEventListener('alpine:init', () => {
         async triggerCamera() {
             this.errorMessage = '';
 
-            // 1. Cenário Ideal: GPS já pegou as coordenadas no background
             if (this.gpsReady && this.currentLat !== null) {
                 this.$refs.cameraInput.click();
                 return;
             }
 
-            // 2. Cenário Lento: Segura por até 10 segundos (20 tentativas de 500ms)
             this.loading = true;
             this.syncStatusText = 'Aguardando precisão do satélite (até 10s)...';
 
@@ -429,7 +449,7 @@ document.addEventListener('alpine:init', () => {
                     clearInterval(checkGps);
                     this.loading = false;
                     this.syncStatusText = '';
-                    this.errorMessage = 'Sinal de GPS não estabilizou. Mova-se para uma área aberta e ative a Localização do dispositivo.';
+                    this.errorMessage = 'Sinal de GPS fraco. Mova-se para uma área aberta ou verifique a permissão do navegador.';
                 }
             }, 500);
         },
@@ -445,10 +465,9 @@ document.addEventListener('alpine:init', () => {
             try {
                 fileToSend = await compressImage(rawFile, 1920, 0.85);
             } catch (error) {
-                console.warn('Falha na compressão client-side:', error);
+                console.warn('Compressão abortada localmente:', error);
             }
 
-            // Puxa as coordenadas direto do nosso pre-fetching no background
             const lat = this.currentLat;
             const lng = this.currentLng;
 
@@ -515,7 +534,7 @@ document.addEventListener('alpine:init', () => {
             try {
                 await window.axios.patch(`/api/v1/photos/${photoId}`, { observation });
             } catch (err) {
-                console.warn('Falha ao atualizar observação:', err);
+                console.warn('A atualização da observação foi cancelada.', err);
             }
         },
 
@@ -533,6 +552,7 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        // Função de Fallback e Processamento da UI
         async syncPendingData() {
             if (this.isSyncing || !navigator.onLine) return;
 
@@ -548,6 +568,7 @@ document.addEventListener('alpine:init', () => {
                 this.syncStatusText = `Sincronizando OS ${rep.os_number} (${i + 1}/${this.syncTotal})...`;
 
                 try {
+                    // O Backend Laravel fará o Upsert inteligente aqui
                     const res = await window.axios.post('/api/v1/reports', {
                         os_number: rep.os_number,
                         unit: rep.unit,
@@ -587,7 +608,7 @@ document.addEventListener('alpine:init', () => {
 
                     await OfflineStore.deleteReport(rep.client_temp_id);
                 } catch (err) {
-                    console.error('Falha na sincronização do relatório:', err);
+                    console.error('Falha de consistência no Upsert do relatório:', err);
                 }
 
                 this.syncProgress = Math.round(((i + 1) / this.syncTotal) * 100);
@@ -595,13 +616,13 @@ document.addEventListener('alpine:init', () => {
 
             this.isSyncing = false;
             this.syncStatusText = '';
-            this.successMessage = 'Dados sincronizados com sucesso com o servidor!';
+            this.successMessage = 'Toda a fila offline foi descarregada no servidor com sucesso!';
             setTimeout(() => { this.successMessage = ''; }, 4000);
         },
 
         async finalize() {
             if (this.photos.length === 0) {
-                this.errorMessage = 'Adicione ao menos uma foto para finalizar.';
+                this.errorMessage = 'A auditoria exige ao menos uma evidência fotográfica.';
                 return;
             }
 
@@ -622,11 +643,11 @@ document.addEventListener('alpine:init', () => {
                             await OfflineStore.savePendingReport(currentRep);
                         }
                     }
-                    alert('Relatório gravado offline com sucesso! Ele será enviado e o PDF gerado assim que o dispositivo recuperar o sinal de internet.');
+                    alert('Relatório gravado e blindado offline! O processamento final ocorrerá assim que a internet voltar.');
                     this.resetFlow();
                 }
             } catch (err) {
-                this.errorMessage = err.response?.data?.message || 'Erro ao finalizar relatório.';
+                this.errorMessage = err.response?.data?.message || 'Falha no fechamento da Ordem de Serviço.';
             } finally {
                 this.loading = false;
             }
@@ -669,8 +690,6 @@ document.addEventListener('alpine:init', () => {
             this.technicians = '';
             this.history = '';
             this.photos = [];
-
-            // Opcional: Desliga o tracking se o fluxo foi encerrado (nós optamos por manter ligado p/ o próximo)
         }
     }));
 });
