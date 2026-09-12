@@ -138,6 +138,12 @@ document.addEventListener('alpine:init', () => {
         syncTotal: 0,
         syncStatusText: '',
 
+        // GPS Aquecido em Background
+        gpsWatcherId: null,
+        currentLat: null,
+        currentLng: null,
+        gpsReady: false,
+
         // Taxonomias Dinâmicas & Autocomplete
         availableUnits: [],
         unitSuggestions: [],
@@ -179,6 +185,29 @@ document.addEventListener('alpine:init', () => {
             if (this.isOnline) {
                 this.syncPendingData();
             }
+
+            // Ativa a antena de GPS em background assim que o fluxo inicia
+            this.startGpsTracking();
+        },
+
+        startGpsTracking() {
+            if (!navigator.geolocation) return;
+
+            this.gpsWatcherId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    this.currentLat = pos.coords.latitude;
+                    this.currentLng = pos.coords.longitude;
+                    this.gpsReady = true;
+                },
+                (err) => {
+                    console.warn('Aviso do GPS Background:', err.message);
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 5000,
+                    timeout: 15000
+                }
+            );
         },
 
         async loadTaxonomies() {
@@ -334,7 +363,6 @@ document.addEventListener('alpine:init', () => {
                 const tempId = this.reportId || ('temp_' + Date.now());
                 this.reportId = tempId;
 
-                // 🛡️ Blindagem contra Proxies do Alpine.js para o IndexedDB
                 const rawData = JSON.parse(JSON.stringify({
                     client_temp_id: tempId,
                     ...payload,
@@ -364,8 +392,37 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        triggerCamera() {
-            this.$refs.cameraInput.click();
+        async triggerCamera() {
+            this.errorMessage = '';
+
+            // 1. Cenário Ideal: GPS já pegou as coordenadas no background
+            if (this.gpsReady && this.currentLat !== null) {
+                this.$refs.cameraInput.click();
+                return;
+            }
+
+            // 2. Cenário Lento: Segura por até 10 segundos (20 tentativas de 500ms)
+            this.loading = true;
+            this.syncStatusText = 'Aguardando precisão do satélite (até 10s)...';
+
+            let attempts = 0;
+            const maxAttempts = 20;
+
+            const checkGps = setInterval(() => {
+                attempts++;
+
+                if (this.gpsReady && this.currentLat !== null) {
+                    clearInterval(checkGps);
+                    this.loading = false;
+                    this.syncStatusText = '';
+                    this.$refs.cameraInput.click();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkGps);
+                    this.loading = false;
+                    this.syncStatusText = '';
+                    this.errorMessage = 'Sinal de GPS não estabilizou. Mova-se para uma área aberta e ative a Localização do dispositivo.';
+                }
+            }, 500);
         },
 
         async handlePhotoCapture(event) {
@@ -382,18 +439,9 @@ document.addEventListener('alpine:init', () => {
                 console.warn('Falha na compressão client-side:', error);
             }
 
-            let lat = null;
-            let lng = null;
-
-            try {
-                const position = await this.getCurrentLocation();
-                lat = position.coords.latitude;
-                lng = position.coords.longitude;
-            } catch (posError) {
-                console.warn('GPS indisponível:', posError);
-                lat = -22.7641;
-                lng = -43.3994;
-            }
+            // Puxa as coordenadas direto do nosso pre-fetching no background
+            const lat = this.currentLat;
+            const lng = this.currentLng;
 
             const formData = new FormData();
             formData.append('photo', fileToSend);
@@ -451,19 +499,6 @@ document.addEventListener('alpine:init', () => {
                 this.loading = false;
                 event.target.value = '';
             }
-        },
-
-        getCurrentLocation() {
-            return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error('Geolocalização não suportada.'));
-                }
-                navigator.geolocation.getCurrentPosition(resolve, reject, {
-                    enableHighAccuracy: true,
-                    timeout: 8000,
-                    maximumAge: 0
-                });
-            });
         },
 
         async updatePhotoObservation(photoId, observation) {
@@ -625,6 +660,8 @@ document.addEventListener('alpine:init', () => {
             this.technicians = '';
             this.history = '';
             this.photos = [];
+
+            // Opcional: Desliga o tracking se o fluxo foi encerrado (nós optamos por manter ligado p/ o próximo)
         }
     }));
 });

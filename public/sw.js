@@ -1,4 +1,4 @@
-const CACHE_NAME = 'foto-os-v2';
+const CACHE_NAME = 'foto-os-v3';
 
 const ASSETS_TO_CACHE = [
     '/',
