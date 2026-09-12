@@ -61,15 +61,9 @@ const OfflineStore = {
                 req.onerror = () => reject(req.error);
             });
         }
-        // Escuta os avisos vindos do Service Worker (Background Sync)
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.addEventListener('message', (event) => {
-                if (event.data && event.data.type === 'TRIGGER_SYNC') {
-                    console.info('Sinal de Background Sync recebido!');
-                    this.syncPendingData();
-                }
-            });
-        }
+
+        // ❌ O CÓDIGO QUE ESTAVA AQUI FOI REMOVIDO!
+
         return this.dbPromise;
     },
 
@@ -215,6 +209,16 @@ document.addEventListener('alpine:init', () => {
 
             if (this.isOnline) {
                 this.syncPendingData();
+            }
+
+            // 🛡️ AQUI É O LUGAR CERTO: Escuta os avisos do Background Sync do SW
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                    if (event.data && event.data.type === 'TRIGGER_SYNC') {
+                        console.info('Sinal de Background Sync recebido pelo Alpine!');
+                        this.syncPendingData();
+                    }
+                });
             }
 
             // Ativa a antena de GPS no modo invisível (Warm-up)
@@ -561,7 +565,6 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        // Função de Fallback e Processamento da UI
         async syncPendingData() {
             if (this.isSyncing || !navigator.onLine) return;
 
@@ -577,7 +580,6 @@ document.addEventListener('alpine:init', () => {
                 this.syncStatusText = `Sincronizando OS ${rep.os_number} (${i + 1}/${this.syncTotal})...`;
 
                 try {
-                    // O Backend Laravel fará o Upsert inteligente aqui
                     const res = await window.axios.post('/api/v1/reports', {
                         os_number: rep.os_number,
                         unit: rep.unit,
