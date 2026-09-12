@@ -191,16 +191,25 @@ document.addEventListener('alpine:init', () => {
         },
 
         startGpsTracking() {
-            if (!navigator.geolocation) return;
+            if (!navigator.geolocation) {
+                this.syncStatusText = 'Geolocalização não suportada neste aparelho.';
+                return;
+            }
 
             this.gpsWatcherId = navigator.geolocation.watchPosition(
                 (pos) => {
                     this.currentLat = pos.coords.latitude;
                     this.currentLng = pos.coords.longitude;
                     this.gpsReady = true;
+                    this.syncStatusText = '';
                 },
                 (err) => {
-                    console.warn('Aviso do GPS Background:', err.message);
+                    let motivo = '';
+                    if (err.code === 1) motivo = 'PERMISSÃO NEGADA (Chrome barrando o TWA)';
+                    else if (err.code === 2) motivo = 'SINAL INDISPONÍVEL (Android não acha satélite)';
+                    else if (err.code === 3) motivo = 'TIMEOUT (Estourou o tempo)';
+
+                    this.syncStatusText = `ERRO GPS [Cód ${err.code}]: ${motivo}`;
                 },
                 {
                     enableHighAccuracy: true,
