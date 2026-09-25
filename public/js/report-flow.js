@@ -573,7 +573,8 @@ document.addEventListener('alpine:init', () => {
                     blob: fileToSend,
                     latitude: lat,
                     longitude: lng,
-                    created_at: new DatetoISOString()
+                    // 🛡️ CORREÇÃO: O erro de sintaxe estava exatamente na linha abaixo
+                    created_at: new Date().toISOString()
                 });
 
                 this.photos.push({
