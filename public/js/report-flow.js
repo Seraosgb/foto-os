@@ -45,7 +45,6 @@ const OfflineStore = {
     init() {
         if (!this.dbPromise) {
             this.dbPromise = new Promise((resolve, reject) => {
-                // Padrão Gemini: Incrementado para versão 2 para garantir upgrades de schema futuros
                 const req = indexedDB.open('FotoOS_DB', 2);
 
                 req.onupgradeneeded = (e) => {
@@ -61,13 +60,9 @@ const OfflineStore = {
                 req.onerror = () => reject(req.error);
             });
         }
-
-        // ❌ O CÓDIGO QUE ESTAVA AQUI FOI REMOVIDO!
-
         return this.dbPromise;
     },
 
-    // Injeção da Background Sync API
     async registerBackgroundSync() {
         if ('serviceWorker' in navigator && 'SyncManager' in window) {
             try {
@@ -155,27 +150,23 @@ document.addEventListener('alpine:init', () => {
         pdfUrl: null,
         isFinalized: false,
 
-        // Status de Rede e Sincronização (Interface de Pendências)
         isOnline: navigator.onLine,
         isSyncing: false,
         syncProgress: 0,
         syncTotal: 0,
         syncStatusText: '',
 
-        // GPS Aquecido em Background
         gpsWatcherId: null,
         currentLat: null,
         currentLng: null,
         gpsReady: false,
 
-        // Taxonomias Dinâmicas & Autocomplete
         availableUnits: [],
         unitSuggestions: [],
         sectorSuggestions: [],
         showUnitDropdown: false,
         showSectorDropdown: false,
 
-        // Campos do Formulário
         osNumber: '',
         unit: '',
         sectorInput: '',
@@ -186,17 +177,62 @@ document.addEventListener('alpine:init', () => {
 
         debounceSearchTimer: null,
 
+        // Função para salvar o estado no localStorage
+        saveState() {
+            localStorage.setItem('fotoos_recovery_state', JSON.stringify({
+                step: this.step,
+                reportId: this.reportId,
+                osNumber: this.osNumber,
+                unit: this.unit,
+                sectors: this.sectors,
+                technicians: this.technicians,
+                history: this.history,
+                photos: this.photos,
+                isFinalized: this.isFinalized
+            }));
+        },
+
+        // Função para restaurar o estado do localStorage
+        restoreState() {
+            const saved = localStorage.getItem('fotoos_recovery_state');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    this.step = data.step || 1;
+                    this.reportId = data.reportId || null;
+                    this.osNumber = data.osNumber || '';
+                    this.unit = data.unit || '';
+                    this.sectors = data.sectors || [];
+                    this.technicians = data.technicians || '';
+                    this.history = data.history || '';
+                    this.photos = data.photos || [];
+                    this.isFinalized = data.isFinalized || false;
+                } catch (e) {
+                    console.warn('Falha ao restaurar estado da sessão.');
+                }
+            }
+        },
+
         async init() {
+            // Tenta recuperar o estado salvo imediatamente ao iniciar
+            this.restoreState();
+
             if (!navigator.onLine) {
                 console.info('Modo Offline: Trabalhando com dados locais.');
             } else {
                 await this.loadTaxonomies();
+                // Se o app recarregou na etapa 2 com uma OS online, busca as fotos atualizadas
+                if (this.osNumber && this.step === 2 && !String(this.reportId).startsWith('temp_')) {
+                    await this.searchOs();
+                }
             }
 
-            this.$watch('unit', () => this.filterUnits());
+            // Monitora os campos para salvar o estado a cada alteração
+            this.$watch('unit', () => { this.filterUnits(); this.saveState(); });
             this.$watch('sectorInput', () => this.filterSectors());
+            this.$watch('history', () => this.saveState());
+            this.$watch('technicians', () => this.saveState());
 
-            // Listener de Conexão: Fallback imediato para iOS e navegadores antigos
             window.addEventListener('online', () => {
                 this.isOnline = true;
                 this.syncPendingData();
@@ -211,7 +247,6 @@ document.addEventListener('alpine:init', () => {
                 this.syncPendingData();
             }
 
-            // 🛡️ AQUI É O LUGAR CERTO: Escuta os avisos do Background Sync do SW
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.addEventListener('message', (event) => {
                     if (event.data && event.data.type === 'TRIGGER_SYNC') {
@@ -221,7 +256,6 @@ document.addEventListener('alpine:init', () => {
                 });
             }
 
-            // Ativa a antena de GPS no modo invisível (Warm-up)
             this.startGpsTracking();
         },
 
@@ -278,6 +312,7 @@ document.addEventListener('alpine:init', () => {
             this.unit = item.name;
             this.showUnitDropdown = false;
             this.filterSectors();
+            this.saveState();
         },
 
         filterSectors() {
@@ -303,6 +338,7 @@ document.addEventListener('alpine:init', () => {
         onOsInput() {
             clearTimeout(this.debounceSearchTimer);
             const os = (this.osNumber || '').trim();
+            this.saveState();
 
             if (!os || os.length < 2) {
                 this.successMessage = '';
@@ -344,6 +380,7 @@ document.addEventListener('alpine:init', () => {
                         this.successMessage = `OS encontrada! Rascunho recuperado com ${this.photos.length} foto(s).`;
                     }
                     this.filterSectors();
+                    this.saveState();
                 } else {
                     this.successMessage = '';
                     this.isFinalized = false;
@@ -364,6 +401,7 @@ document.addEventListener('alpine:init', () => {
                 await window.axios.post(`/api/v1/reports/${this.reportId}/reopen`);
                 this.isFinalized = false;
                 this.successMessage = 'OS reaberta com sucesso! Você pode editar os dados e capturar mais fotos.';
+                this.saveState();
             } catch (err) {
                 this.errorMessage = err.response?.data?.error || 'Erro ao reabrir OS.';
             } finally {
@@ -378,12 +416,14 @@ document.addEventListener('alpine:init', () => {
                 this.sectorInput = '';
                 this.showSectorDropdown = false;
                 this.filterSectors();
+                this.saveState();
             }
         },
 
         removeSector(index) {
             this.sectors.splice(index, 1);
             this.filterSectors();
+            this.saveState();
         },
 
         async startReport() {
@@ -416,6 +456,7 @@ document.addEventListener('alpine:init', () => {
                 await OfflineStore.savePendingReport(rawData);
                 this.errorMessage = '';
                 this.step = 2;
+                this.saveState();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             };
 
@@ -424,6 +465,7 @@ document.addEventListener('alpine:init', () => {
                     const response = await window.axios.post('/api/v1/reports', payload);
                     this.reportId = response.data.data.id;
                     this.step = 2;
+                    this.saveState();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
                     await salvarOffline();
@@ -438,6 +480,9 @@ document.addEventListener('alpine:init', () => {
 
         async triggerCamera() {
             this.errorMessage = '';
+
+            // Salva o estado imediatamente antes de abrir a câmera
+            this.saveState();
 
             if (this.gpsReady && this.currentLat !== null) {
                 this.$refs.cameraInput.click();
@@ -528,7 +573,7 @@ document.addEventListener('alpine:init', () => {
                     blob: fileToSend,
                     latitude: lat,
                     longitude: lng,
-                    created_at: new Date().toISOString()
+                    created_at: new DatetoISOString()
                 });
 
                 this.photos.push({
@@ -539,10 +584,13 @@ document.addEventListener('alpine:init', () => {
             } finally {
                 this.loading = false;
                 event.target.value = '';
+                // Atualiza o estado salvo após adicionar a nova foto
+                this.saveState();
             }
         },
 
         async updatePhotoObservation(photoId, observation) {
+            this.saveState();
             if (String(photoId).startsWith('local_')) return;
             try {
                 await window.axios.patch(`/api/v1/photos/${photoId}`, { observation });
@@ -557,6 +605,7 @@ document.addEventListener('alpine:init', () => {
 
             const item = this.photos.splice(index, 1)[0];
             this.photos.splice(targetIndex, 0, item);
+            this.saveState();
 
             const isTemporary = !this.reportId || String(this.reportId).startsWith('temp_');
             if (navigator.onLine && !isTemporary) {
@@ -645,6 +694,7 @@ document.addEventListener('alpine:init', () => {
                     const res = await window.axios.post(`/api/v1/reports/${this.reportId}/finalize`);
                     this.pdfUrl = res.data.data.pdf_url;
                     this.step = 3;
+                    this.saveState();
                 } else {
                     if (this.reportId) {
                         const pendingReports = await OfflineStore.getPendingReports();
@@ -687,6 +737,7 @@ document.addEventListener('alpine:init', () => {
         },
 
         resetFlow() {
+            localStorage.removeItem('fotoos_recovery_state'); // Zera a memória de hidratação
             this.step = 1;
             this.loading = false;
             this.errorMessage = '';
